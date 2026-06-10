@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply m-0 min-h-screen bg-base text-ink font-sans antialiased;
+}
+
+#root {
+  @apply min-h-screen;
+}
+
+/* Thin, themed scrollbars for the dense panels */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #232936 transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-surface-line;
+}
+*::-webkit-scrollbar-thumb:hover {
+  @apply bg-ink-ghost;
+}
+
+/* React Flow theming */
+.react-flow__node {
+  @apply font-sans;
+}
+.react-flow__attribution {
+  display: none;
+}
+.react-flow__edge-path {
+  stroke: #2fd39e;
+  stroke-width: 1.5;
+  opacity: 0.55;
+}
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: #45e3b0;
+  opacity: 1;
+}
+.react-flow__handle {
+  width: 9px;
+  height: 9px;
+  background: #0c0e13;
+  border: 1.5px solid #2fd39e;
+}
+.react-flow__handle:hover {
+  background: #2fd39e;
+}
+.react-flow__controls-button {
+  background: #161a22;
+  border-color: #232936;
+  color: #aeb2bd;
+}
+.react-flow__controls-button:hover {
+  background: #1d222c;
+}
+
+@layer components {
+  .btn-ghost {
+    @apply inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-surface-panel px-3 py-1.5 text-sm text-ink-muted transition hover:border-white/10 hover:bg-surface-hover hover:text-ink;
+  }
+  .btn-primary {
+    @apply inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-1.5 text-sm font-semibold text-[#08090c] shadow-glow transition hover:bg-accent-bright disabled:opacity-50;
+  }
+  .panel {
+    @apply rounded-2xl border border-white/[0.06] bg-surface backdrop-blur;
+  }
+  .chip {
+    @apply inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider;
+  }
+  .input {
+    @apply w-full rounded-lg border border-white/[0.06] bg-surface-panel px-3 py-2 text-sm text-ink outline-none transition focus:border-accent/50 focus:ring-1 focus:ring-accent/30;
+  }
+}

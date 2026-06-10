@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+package-lock.json
+
+# Build outputs
+backend/bin/
+frontend/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go
+*.test
+*.out
+vendor/
+
+# Environment
+.env
+.env.local
+backend/.env
+frontend/.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Coverage
+coverage/
+*.coverprofile
+ScaleForge (standalone).html
+spec.md
+.playwright-mcp/
