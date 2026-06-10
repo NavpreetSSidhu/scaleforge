@@ -1,5 +1,7 @@
 # ScaleForge
 
+[![CI](https://github.com/NavpreetSSidhu/scaleforge/actions/workflows/ci.yml/badge.svg)](https://github.com/NavpreetSSidhu/scaleforge/actions/workflows/ci.yml)
+
 ScaleForge is a gamified infrastructure architecture simulator. Engineers can visually design distributed systems on a canvas, define traffic profiles, and run simulations to estimate latency, throughput, cost, bottlenecks, and architecture scores.
 
 ## Architecture
@@ -116,6 +118,7 @@ Expected results (approximate):
 | DELETE | `/architectures/:id`  | Delete architecture            |
 | POST   | `/simulate`           | Run simulation                 |
 | GET    | `/simulation/:id`     | Get saved simulation result    |
+| GET    | `/achievements`       | List achievements + unlock state |
 
 ### Simulate request example
 

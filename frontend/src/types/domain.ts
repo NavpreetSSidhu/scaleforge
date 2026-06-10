@@ -75,6 +75,17 @@ export interface Scores {
   overallGrade: string;
 }
 
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  /** lucide icon name (PascalCase mapped on the client). */
+  icon: string;
+  hint: string;
+  unlocked: boolean;
+  unlockedAt?: string;
+}
+
 export interface SimulationResult {
   id: string;
   architectureId?: string;
@@ -88,6 +99,8 @@ export interface SimulationResult {
   scores: Scores;
   recommendations: string[];
   createdAt: string;
+  /** Achievements unlocked by this run (for the celebration toast). */
+  newAchievements?: Achievement[];
 }
 
 export interface SimulateRequest {

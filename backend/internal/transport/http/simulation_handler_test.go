@@ -7,8 +7,10 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/scaleforge/scaleforge/internal/achievements"
 	"github.com/scaleforge/scaleforge/internal/catalog"
 	"github.com/scaleforge/scaleforge/internal/cost"
 	"github.com/scaleforge/scaleforge/internal/middleware"
@@ -34,11 +36,37 @@ func (f *fakeSimRepo) GetSimulation(_ context.Context, _, _ string) (*simulation
 	return f.getByID, f.getErr
 }
 
+// fakeAchievementsRepo implements achievements.Repository for handler tests.
+type fakeAchievementsRepo struct {
+	unlocked map[string]time.Time
+}
+
+func (f *fakeAchievementsRepo) ListUnlocked(_ context.Context, _ string) (map[string]time.Time, error) {
+	if f.unlocked == nil {
+		return map[string]time.Time{}, nil
+	}
+	return f.unlocked, nil
+}
+
+func (f *fakeAchievementsRepo) Unlock(_ context.Context, _ string, ids []string) ([]string, error) {
+	if f.unlocked == nil {
+		f.unlocked = map[string]time.Time{}
+	}
+	var newly []string
+	for _, id := range ids {
+		if _, ok := f.unlocked[id]; !ok {
+			f.unlocked[id] = time.Now().UTC()
+			newly = append(newly, id)
+		}
+	}
+	return newly, nil
+}
+
 func newSimTestRouter(repo simulation.Repository) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	cat := catalog.NewService()
 	svc := simulation.NewService(cat, cost.NewCalculator(cat), scoring.NewScorer(), repo)
-	h := NewSimulationHandler(svc)
+	h := NewSimulationHandler(svc, cat, achievements.NewService(&fakeAchievementsRepo{}))
 
 	r := gin.New()
 	api := r.Group("/")

@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/scaleforge/scaleforge/internal/achievements"
 	"github.com/scaleforge/scaleforge/internal/auth"
 	"github.com/scaleforge/scaleforge/internal/catalog"
 	"github.com/scaleforge/scaleforge/internal/config"
@@ -40,10 +41,12 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 	scorer := scoring.NewScorer()
 	simService := simulation.NewService(catalogService, costCalculator, scorer, deps.Store)
 	authService := auth.NewService(deps.Store, cfg.JWTSecret, 0)
+	achievementsService := achievements.NewService(deps.Store)
 
 	archHandler := NewArchitectureHandler(deps.Store, catalogService, deps.Store)
-	simHandler := NewSimulationHandler(simService)
+	simHandler := NewSimulationHandler(simService, catalogService, achievementsService)
 	authHandler := NewAuthHandler(authService)
+	achievementsHandler := NewAchievementsHandler(achievementsService)
 
 	r.GET("/health", archHandler.Health)
 
@@ -73,6 +76,8 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 		authed.DELETE("/architectures/:id", archHandler.Delete)
 
 		authed.GET("/simulation/:id", simHandler.Get)
+
+		authed.GET("/achievements", achievementsHandler.List)
 	}
 
 	return r
@@ -84,4 +89,5 @@ var (
 	_ simulation.Repository             = (*postgres.Store)(nil)
 	_ repository.HealthChecker          = (*postgres.Store)(nil)
 	_ auth.UserRepository               = (*postgres.Store)(nil)
+	_ achievements.Repository           = (*postgres.Store)(nil)
 )

@@ -11,6 +11,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { AchievementsPanel } from '@/features/achievements/AchievementsPanel';
 import { compact, timeAgo } from '@/lib/format';
 import { templates, type Template } from '@/data/templates';
 import { useArchitectureStore } from '@/store/architectureStore';
@@ -173,6 +174,8 @@ export function DashboardView() {
                 ))}
               </div>
             </section>
+
+            <AchievementsPanel />
 
             <section className="rounded-2xl border border-white/[0.06] bg-surface/40 p-4">
               <h2 className="mb-3 text-sm font-semibold text-ink">Activity</h2>

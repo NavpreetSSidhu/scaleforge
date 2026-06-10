@@ -4,12 +4,14 @@ import { api, setAuthTokenProvider, UnauthorizedError } from '@/lib/api';
 import { readShareLink } from '@/lib/share';
 import { useArchitectureStore } from '@/store/architectureStore';
 import { GUEST_SIM_LIMIT, useAuthStore } from '@/store/authStore';
+import { useAchievementToastStore } from '@/store/achievementToastStore';
 import { TopBar } from '@/features/shell/TopBar';
 import { BuilderView } from '@/features/builder/BuilderView';
 import { DashboardView } from '@/features/dashboard/DashboardView';
 import { MobileView } from '@/features/mobile/MobileView';
 import { ReportDrawer } from '@/features/report/ReportDrawer';
 import { AuthModal } from '@/features/auth/AuthModal';
+import { AchievementToaster } from '@/features/achievements/AchievementToast';
 
 // api.ts reads the token through this provider so it stays decoupled from the store.
 setAuthTokenProvider(() => useAuthStore.getState().token);
@@ -36,6 +38,13 @@ export default function App() {
     onSuccess: (result) => {
       setSimulationResult(result);
       useAuthStore.getState().registerGuestRun();
+      if (result.newAchievements?.length) {
+        useAchievementToastStore.getState().push(result.newAchievements);
+        // Refresh the dashboard grid for signed-in users.
+        if (useAuthStore.getState().user) {
+          queryClient.invalidateQueries({ queryKey: ['achievements'] });
+        }
+      }
     },
   });
 
@@ -150,6 +159,7 @@ export default function App() {
 
       <ReportDrawer />
       <AuthModal />
+      <AchievementToaster />
     </div>
   );
 }

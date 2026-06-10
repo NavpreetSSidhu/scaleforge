@@ -1,4 +1,5 @@
 import type {
+  Achievement,
   Architecture,
   Graph,
   NodeDefinition,
@@ -95,4 +96,7 @@ export const api = {
     request<void>(`/architectures/${id}`, { method: 'DELETE' }),
 
   getSimulation: (id: string) => request<SimulationResult>(`/simulation/${id}`),
+
+  listAchievements: () =>
+    request<{ achievements: Achievement[] }>('/achievements').then((r) => r.achievements),
 };
