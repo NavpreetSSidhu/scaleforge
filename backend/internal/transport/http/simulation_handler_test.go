@@ -14,6 +14,7 @@ import (
 	"github.com/scaleforge/scaleforge/internal/catalog"
 	"github.com/scaleforge/scaleforge/internal/cost"
 	"github.com/scaleforge/scaleforge/internal/middleware"
+	"github.com/scaleforge/scaleforge/internal/pricing"
 	"github.com/scaleforge/scaleforge/internal/repository"
 	"github.com/scaleforge/scaleforge/internal/scoring"
 	"github.com/scaleforge/scaleforge/internal/simulation"
@@ -65,7 +66,7 @@ func (f *fakeAchievementsRepo) Unlock(_ context.Context, _ string, ids []string)
 func newSimTestRouter(repo simulation.Repository) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	cat := catalog.NewService()
-	svc := simulation.NewService(cat, cost.NewCalculator(cat), scoring.NewScorer(), repo)
+	svc := simulation.NewService(cat, cost.NewCalculator(cat, pricing.NewCatalog()), scoring.NewScorer(), repo)
 	h := NewSimulationHandler(svc, cat, achievements.NewService(&fakeAchievementsRepo{}))
 
 	r := gin.New()
@@ -73,6 +74,7 @@ func newSimTestRouter(repo simulation.Repository) *gin.Engine {
 	api.Use(middleware.DevAuth(testUserID))
 	{
 		api.POST("/simulate", h.Simulate)
+		api.POST("/compare", h.Compare)
 		api.GET("/simulation/:id", h.Get)
 	}
 	return r
@@ -129,6 +131,43 @@ func TestSimulateRejectsInvalidJSON(t *testing.T) {
 	router.ServeHTTP(rec, req)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("simulate status = %d, want 400", rec.Code)
+	}
+}
+
+func TestCompareReturnsScenariosAndWinners(t *testing.T) {
+	router := newSimTestRouter(&fakeSimRepo{})
+
+	traffic := simulation.TrafficProfile{ConcurrentUsers: 5000, RequestsPerUserMin: 2, PeakTrafficMultiplier: 1.5}
+	req := simulation.CompareRequest{Scenarios: []simulation.CompareScenario{
+		{Label: "AWS", Provider: "aws", Graph: jsonGraph(), Traffic: traffic},
+		{Label: "GCP", Provider: "gcp", Graph: jsonGraph(), Traffic: traffic},
+	}}
+
+	rec := doJSON(router, http.MethodPost, "/compare", req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("compare status = %d, want 200 (body: %s)", rec.Code, rec.Body.String())
+	}
+
+	var cmp simulation.Comparison
+	if err := json.Unmarshal(rec.Body.Bytes(), &cmp); err != nil {
+		t.Fatalf("decode comparison: %v", err)
+	}
+	if len(cmp.Scenarios) != 2 {
+		t.Fatalf("expected 2 scenarios, got %d", len(cmp.Scenarios))
+	}
+	if cmp.Winners[simulation.MetricCost] != 1 {
+		t.Errorf("cost winner = %d, want 1 (GCP cheaper)", cmp.Winners[simulation.MetricCost])
+	}
+}
+
+func TestCompareRequiresTwoScenarios(t *testing.T) {
+	router := newSimTestRouter(&fakeSimRepo{})
+	req := simulation.CompareRequest{Scenarios: []simulation.CompareScenario{
+		{Label: "only-one", Graph: jsonGraph(), Traffic: simulation.TrafficProfile{ConcurrentUsers: 100, RequestsPerUserMin: 1}},
+	}}
+	rec := doJSON(router, http.MethodPost, "/compare", req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("compare with one scenario status = %d, want 400", rec.Code)
 	}
 }
 

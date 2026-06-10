@@ -7,6 +7,7 @@ import (
 
 	"github.com/scaleforge/scaleforge/internal/catalog"
 	"github.com/scaleforge/scaleforge/internal/cost"
+	"github.com/scaleforge/scaleforge/internal/pricing"
 	"github.com/scaleforge/scaleforge/internal/scoring"
 )
 
@@ -36,7 +37,7 @@ func (f *fakeRepo) GetSimulation(_ context.Context, _, _ string) (*Result, error
 
 func newService(repo Repository) *Service {
 	cat := catalog.NewService()
-	return NewService(cat, cost.NewCalculator(cat), scoring.NewScorer(), repo)
+	return NewService(cat, cost.NewCalculator(cat, pricing.NewCatalog()), scoring.NewScorer(), repo)
 }
 
 func demoRequest() SimulateRequest {

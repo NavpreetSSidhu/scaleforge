@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { animate } from 'framer-motion';
 import { Activity, AlertTriangle, DollarSign, Timer, Users } from 'lucide-react';
 import { compact, compactUsd } from '@/lib/format';
+import { providerShortLabel } from '@/features/shell/ProviderSelector';
 import { overallScore, gradeMeta } from '@/lib/score';
 import { useArchitectureStore } from '@/store/architectureStore';
 import type { SimulationResult } from '@/types/domain';
@@ -59,6 +60,7 @@ export function MetricsStrip() {
         icon={<DollarSign className="h-4 w-4 text-amber" />}
         label="Est. cost"
         value={r ? <CountUp value={r.monthlyCostUsd} format={(n) => `${compactUsd(n)} /mo`} /> : '—'}
+        sub={r?.provider ? providerShortLabel(r.provider) : undefined}
       />
 
       <div className="ml-auto flex items-center gap-2">

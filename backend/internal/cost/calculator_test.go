@@ -4,10 +4,11 @@ import (
 	"testing"
 
 	"github.com/scaleforge/scaleforge/internal/catalog"
+	"github.com/scaleforge/scaleforge/internal/pricing"
 )
 
 func newCalculator() *Calculator {
-	return NewCalculator(catalog.NewService())
+	return NewCalculator(catalog.NewService(), pricing.NewCatalog())
 }
 
 func TestMonthlyCostSumsUnitCostTimesReplicas(t *testing.T) {

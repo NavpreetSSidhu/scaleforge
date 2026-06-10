@@ -60,6 +60,22 @@ func (h *SimulationHandler) Simulate(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// Compare evaluates several scenarios and returns each result plus per-metric
+// winners. Like Simulate it is guest-friendly and never persists.
+func (h *SimulationHandler) Compare(c *gin.Context) {
+	var req simulation.CompareRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		return
+	}
+	if len(req.Scenarios) < 2 {
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "at least two scenarios are required to compare"})
+		return
+	}
+
+	c.JSON(http.StatusOK, h.service.Compare(req))
+}
+
 func (h *SimulationHandler) Get(c *gin.Context) {
 	result, err := h.service.Get(c.Request.Context(), middleware.GetUserID(c), c.Param("id"))
 	if err != nil {

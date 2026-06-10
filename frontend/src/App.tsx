@@ -8,10 +8,13 @@ import { useAchievementToastStore } from '@/store/achievementToastStore';
 import { TopBar } from '@/features/shell/TopBar';
 import { BuilderView } from '@/features/builder/BuilderView';
 import { DashboardView } from '@/features/dashboard/DashboardView';
+import { CompareView } from '@/features/compare/CompareView';
 import { MobileView } from '@/features/mobile/MobileView';
 import { ReportDrawer } from '@/features/report/ReportDrawer';
 import { AuthModal } from '@/features/auth/AuthModal';
 import { AchievementToaster } from '@/features/achievements/AchievementToast';
+import { Snackbar } from '@/components/Snackbar';
+import { useSnackbar } from '@/store/snackbarStore';
 
 // api.ts reads the token through this provider so it stays decoupled from the store.
 setAuthTokenProvider(() => useAuthStore.getState().token);
@@ -22,6 +25,7 @@ export default function App() {
     id,
     name,
     traffic,
+    provider,
     toGraph,
     view,
     setSimulationResult,
@@ -34,7 +38,8 @@ export default function App() {
   } = useArchitectureStore();
 
   const simulate = useMutation({
-    mutationFn: () => api.simulate({ architectureId: id ?? undefined, name, graph: toGraph(), traffic }),
+    mutationFn: () =>
+      api.simulate({ architectureId: id ?? undefined, name, provider, graph: toGraph(), traffic }),
     onSuccess: (result) => {
       setSimulationResult(result);
       useAuthStore.getState().registerGuestRun();
@@ -56,10 +61,13 @@ export default function App() {
     onSuccess: (arch) => {
       markSaved(arch.id);
       queryClient.invalidateQueries({ queryKey: ['architectures'] });
+      useSnackbar.getState().push('Architecture saved', 'success');
     },
     onError: (err) => {
       if (err instanceof UnauthorizedError) {
         useAuthStore.getState().openAuthPrompt('Sign in to save this architecture to your workspace.');
+      } else {
+        useSnackbar.getState().push(`Couldn't save: ${(err as Error).message}`, 'error');
       }
     },
   });
@@ -89,7 +97,7 @@ export default function App() {
   // the load dial, metrics, bottleneck and recommendations stay live as you
   // scale traffic up or down. Skipped until the first explicit run, and capped
   // for guests so dragging the dial doesn't burn unlimited runs.
-  const trafficKey = `${traffic.concurrentUsers}|${traffic.requestsPerUserMin}|${traffic.peakTrafficMultiplier}`;
+  const trafficKey = `${traffic.concurrentUsers}|${traffic.requestsPerUserMin}|${traffic.peakTrafficMultiplier}|${provider}`;
   useEffect(() => {
     if (!useArchitectureStore.getState().simulationResult) return;
     const auth = useAuthStore.getState();
@@ -155,11 +163,13 @@ export default function App() {
 
       {view === 'builder' && <BuilderView />}
       {view === 'dashboard' && <DashboardView />}
+      {view === 'compare' && <CompareView />}
       {view === 'mobile' && <MobileView onRun={runSimulation} isRunning={simulate.isPending} />}
 
       <ReportDrawer />
       <AuthModal />
       <AchievementToaster />
+      <Snackbar />
     </div>
   );
 }

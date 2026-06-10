@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/scaleforge/scaleforge/internal/catalog"
 	"github.com/scaleforge/scaleforge/internal/cost"
+	"github.com/scaleforge/scaleforge/internal/pricing"
 	"github.com/scaleforge/scaleforge/internal/scoring"
 )
 
@@ -31,9 +32,16 @@ func NewService(
 	}
 }
 
-func (s *Service) Run(ctx context.Context, userID string, req SimulateRequest) (*Result, error) {
+// compute runs the full engine + cost + scoring pipeline for a request without
+// any persistence. Both Run and Compare build on it so cost/scoring stay
+// provider-aware and identical across the two paths.
+func (s *Service) compute(req SimulateRequest) Result {
 	result := runEngine(req.Graph, req.Traffic, s.catalog.Map())
-	result.MonthlyCost = s.calculator.MonthlyCost(toCostGraph(req.Graph))
+	result.Provider = string(pricing.DefaultProviderID)
+	if req.Provider != "" {
+		result.Provider = req.Provider
+	}
+	result.MonthlyCost = s.calculator.MonthlyCostFor(toCostGraph(req.Graph), req.Provider)
 
 	scores := s.scorer.Score(scoring.Metrics{
 		IncomingRPS:      result.IncomingRPS,
@@ -43,6 +51,11 @@ func (s *Service) Run(ctx context.Context, userID string, req SimulateRequest) (
 	}, s.toScoringGraph(req.Graph))
 	result.Scores = toSimulationScores(scores)
 	result.CreatedAt = time.Now().UTC()
+	return result
+}
+
+func (s *Service) Run(ctx context.Context, userID string, req SimulateRequest) (*Result, error) {
+	result := s.compute(req)
 
 	// Guests (no user) get a fully computed result that simply isn't persisted —
 	// the simulations table requires an owning user.
@@ -53,6 +66,19 @@ func (s *Service) Run(ctx context.Context, userID string, req SimulateRequest) (
 	}
 
 	return s.simRepo.CreateSimulation(ctx, userID, req.ArchitectureID, result)
+}
+
+// Compare evaluates several scenarios (different architectures, providers, or
+// traffic) and reports per-metric winners. Results are computed only — nothing
+// is persisted — so comparison works for guests and signed-in users alike.
+func (s *Service) Compare(req CompareRequest) Comparison {
+	scenarios := make([]ScenarioResult, 0, len(req.Scenarios))
+	for _, sc := range req.Scenarios {
+		result := s.compute(SimulateRequest{Graph: sc.Graph, Traffic: sc.Traffic, Provider: sc.Provider})
+		result.ID = uuid.New().String()
+		scenarios = append(scenarios, ScenarioResult{Label: sc.Label, Provider: sc.Provider, Result: result})
+	}
+	return Comparison{Scenarios: scenarios, Winners: pickWinners(scenarios)}
 }
 
 func (s *Service) Get(ctx context.Context, userID, id string) (*Result, error) {
@@ -70,6 +96,7 @@ func toCostGraph(graph Graph) cost.Graph {
 			Type: node.Type,
 			Config: cost.NodeConfig{
 				Replicas: replicas,
+				Region:   node.Config.Region,
 			},
 		}
 	}

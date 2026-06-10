@@ -10,5 +10,6 @@ type Node struct {
 }
 
 type NodeConfig struct {
-	Replicas int `json:"replicas"`
+	Replicas int    `json:"replicas"`
+	Region   string `json:"region,omitempty"`
 }

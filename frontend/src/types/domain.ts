@@ -86,9 +86,27 @@ export interface Achievement {
   unlockedAt?: string;
 }
 
+export interface PricingRegion {
+  id: string;
+  label: string;
+  multiplier: number;
+}
+
+export interface PricingProvider {
+  id: string;
+  label: string;
+  defaultRegion: string;
+  categoryMultipliers: Record<string, number>;
+  regions: PricingRegion[];
+  /** Catalog component type -> this provider's managed-service name. */
+  services: Record<string, string>;
+}
+
 export interface SimulationResult {
   id: string;
   architectureId?: string;
+  /** Cloud provider these costs were priced against (e.g. "aws"). */
+  provider?: string;
   estimatedRps: number;
   incomingRps: number;
   estimatedLatencyMs: number;
@@ -106,8 +124,44 @@ export interface SimulationResult {
 export interface SimulateRequest {
   architectureId?: string;
   name?: string;
+  /** Cloud provider to price against; defaults to AWS server-side when omitted. */
+  provider?: string;
   graph: Graph;
   traffic: TrafficProfile;
+}
+
+export interface CompareScenario {
+  label: string;
+  provider?: string;
+  graph: Graph;
+  traffic: TrafficProfile;
+}
+
+export interface CompareRequest {
+  scenarios: CompareScenario[];
+}
+
+export interface ScenarioResult {
+  label: string;
+  provider?: string;
+  result: SimulationResult;
+}
+
+/** Metric keys reported in Comparison.winners (mapped to a winning scenario index). */
+export type CompareMetric =
+  | 'cost'
+  | 'latency'
+  | 'capacity'
+  | 'performance'
+  | 'reliability'
+  | 'scalability'
+  | 'costEfficiency'
+  | 'maintainability'
+  | 'overall';
+
+export interface Comparison {
+  scenarios: ScenarioResult[];
+  winners: Partial<Record<CompareMetric, number>>;
 }
 
 export interface Architecture {

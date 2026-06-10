@@ -1,8 +1,11 @@
 import type {
   Achievement,
   Architecture,
+  Comparison,
+  CompareRequest,
   Graph,
   NodeDefinition,
+  PricingProvider,
   SimulateRequest,
   SimulationResult,
   TrafficProfile,
@@ -67,8 +70,17 @@ export const api = {
 
   getCatalog: () => request<{ nodes: NodeDefinition[] }>('/catalog'),
 
+  getPricing: () =>
+    request<{ providers: PricingProvider[]; defaultProviderId: string }>('/pricing'),
+
   simulate: (payload: SimulateRequest) =>
     request<SimulationResult>('/simulate', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  compare: (payload: CompareRequest) =>
+    request<Comparison>('/compare', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),

@@ -11,15 +11,17 @@ import type {
 import { demoGraph, demoTraffic } from '@/data/demoScenario';
 
 export type ScoreView = 'cards' | 'gauges' | 'radar';
-export type AppView = 'dashboard' | 'builder' | 'mobile';
+export type AppView = 'dashboard' | 'builder' | 'mobile' | 'compare';
 
 export const DEFAULT_REGION = 'us-east-1';
+export const DEFAULT_PROVIDER = 'aws';
 
 interface ArchitectureState {
   // Document
   id: string | null;
   name: string;
   environment: string;
+  provider: string;
   nodes: GraphNode[];
   edges: GraphEdge[];
   traffic: TrafficProfile;
@@ -39,6 +41,7 @@ interface ArchitectureState {
   // Document actions
   setName: (name: string) => void;
   setEnvironment: (environment: string) => void;
+  setProvider: (provider: string) => void;
   setNodes: (nodes: GraphNode[]) => void;
   setEdges: (edges: GraphEdge[]) => void;
   addNode: (def: NodeDefinition, position?: { x: number; y: number }) => void;
@@ -87,11 +90,13 @@ type LayoutPrefs = {
   libraryCollapsed: boolean;
   inspectorCollapsed: boolean;
   focusMode: boolean;
+  provider: string;
 };
 const defaultLayout: LayoutPrefs = {
   libraryCollapsed: false,
   inspectorCollapsed: false,
   focusMode: false,
+  provider: DEFAULT_PROVIDER,
 };
 
 function loadLayout(): LayoutPrefs {
@@ -119,10 +124,12 @@ const prefsFrom = (s: {
   libraryCollapsed: boolean;
   inspectorCollapsed: boolean;
   focusMode: boolean;
+  provider: string;
 }): LayoutPrefs => ({
   libraryCollapsed: s.libraryCollapsed,
   inspectorCollapsed: s.inspectorCollapsed,
   focusMode: s.focusMode,
+  provider: s.provider,
 });
 
 /** Distinct regions present on the nodes, always including the default + any extras. */
@@ -138,6 +145,7 @@ export const useArchitectureStore = create<ArchitectureState>((set, get) => ({
   id: null,
   name: 'Untitled Architecture',
   environment: 'Production',
+  provider: initialLayout.provider,
   nodes: [],
   edges: [],
   traffic: defaultTraffic,
@@ -156,6 +164,11 @@ export const useArchitectureStore = create<ArchitectureState>((set, get) => ({
 
   setName: (name) => set({ name, dirty: true }),
   setEnvironment: (environment) => set({ environment }),
+  setProvider: (provider) =>
+    set((state) => {
+      saveLayout({ ...prefsFrom(state), provider });
+      return { provider };
+    }),
   setNodes: (nodes) =>
     set((state) => ({ nodes, regions: deriveRegions(nodes, state.regions), dirty: true })),
   setEdges: (edges) => set({ edges, dirty: true }),

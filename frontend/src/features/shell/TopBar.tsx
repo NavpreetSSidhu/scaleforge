@@ -4,6 +4,7 @@ import {
   ChevronDown,
   LayoutDashboard,
   Hammer,
+  GitCompareArrows,
   Smartphone,
   Save,
   Share2,
@@ -13,11 +14,16 @@ import {
   PanelLeft,
   PanelRight,
   LogIn,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useArchitectureStore, type AppView } from '@/store/architectureStore';
 import { useAuthStore } from '@/store/authStore';
+import { useSnackbar } from '@/store/snackbarStore';
 import { buildShareLink, downloadArchitecture } from '@/lib/share';
 import { ProfileMenu } from '@/features/auth/ProfileMenu';
+import { ProviderSelector } from '@/features/shell/ProviderSelector';
+import { Tooltip } from '@/components/Tooltip';
+import { Spinner } from '@/components/Spinner';
 
 const environments: { name: string; multiplier: number }[] = [
   { name: 'Staging', multiplier: 0.5 },
@@ -28,6 +34,7 @@ const environments: { name: string; multiplier: number }[] = [
 const tabs: { id: AppView; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
   { id: 'builder', label: 'Builder', icon: <Hammer className="h-4 w-4" /> },
+  { id: 'compare', label: 'Compare', icon: <GitCompareArrows className="h-4 w-4" /> },
   { id: 'mobile', label: 'Mobile', icon: <Smartphone className="h-4 w-4" /> },
 ];
 
@@ -56,14 +63,10 @@ export function TopBar({ onRun, isRunning, onSave, isSaving }: TopBarProps) {
     setInspectorOpen,
   } = useArchitectureStore();
   const { user, openAuthPrompt, guestRunsLeft } = useAuthStore();
+  const pushSnack = useSnackbar((s) => s.push);
   const isGuest = user == null;
   const [envOpen, setEnvOpen] = useState(false);
-  const [flash, setFlash] = useState<string | null>(null);
-
-  const showFlash = (msg: string) => {
-    setFlash(msg);
-    window.setTimeout(() => setFlash(null), 1800);
-  };
+  const [actionsOpen, setActionsOpen] = useState(false);
 
   /** Run `action` if signed in, otherwise open the auth prompt with `reason`. */
   const requireAuth = (reason: string, action: () => void) => () => {
@@ -75,18 +78,23 @@ export function TopBar({ onRun, isRunning, onSave, isSaving }: TopBarProps) {
 
   const handleExport = requireAuth('Sign in to export your architecture as JSON.', () => {
     downloadArchitecture({ name, graph: toGraph(), traffic });
-    showFlash('Exported');
+    pushSnack('Architecture exported as JSON', 'success');
   });
 
   const handleShare = requireAuth('Sign in to create a shareable link.', async () => {
     const link = buildShareLink({ name, graph: toGraph(), traffic });
     try {
       await navigator.clipboard.writeText(link);
-      showFlash('Link copied');
+      pushSnack('Shareable link copied to clipboard', 'success');
     } catch {
       window.prompt('Copy this shareable link:', link);
     }
   });
+
+  const runAction = (fn: () => void) => () => {
+    setActionsOpen(false);
+    fn();
+  };
 
   const activeMultiplier =
     environments.find((e) => e.name === environment)?.multiplier ?? 1;
@@ -94,14 +102,16 @@ export function TopBar({ onRun, isRunning, onSave, isSaving }: TopBarProps) {
   return (
     <header className="relative z-[45] flex h-14 shrink-0 items-center gap-3 border-b border-white/[0.06] bg-surface/80 px-3 backdrop-blur">
       {/* Library toggle (small screens) */}
-      <button
-        type="button"
-        aria-label="Toggle component library"
-        onClick={() => setLibraryOpen(!libraryOpen)}
-        className="btn-ghost !px-2 lg:hidden"
-      >
-        <PanelLeft className="h-4 w-4" />
-      </button>
+      <Tooltip label="Toggle component library" className="lg:hidden">
+        <button
+          type="button"
+          aria-label="Toggle component library"
+          onClick={() => setLibraryOpen(!libraryOpen)}
+          className="btn-ghost !px-2"
+        >
+          <PanelLeft className="h-4 w-4" />
+        </button>
+      </Tooltip>
 
       {/* Logo */}
       <div className="flex items-center gap-2">
@@ -125,26 +135,29 @@ export function TopBar({ onRun, isRunning, onSave, isSaving }: TopBarProps) {
 
       <div className="ml-auto flex items-center gap-2">
         <span className="hidden text-xs lg:block">
-          {flash ? (
-            <span className="text-accent">{flash}</span>
-          ) : (
-            <span className="text-ink-faint">{dirty ? 'unsaved changes' : 'all changes saved'}</span>
-          )}
+          <span className="text-ink-faint">{dirty ? 'unsaved changes' : 'all changes saved'}</span>
         </span>
 
+        {/* Cloud pricing provider */}
+        <div className="hidden sm:block">
+          <ProviderSelector />
+        </div>
+
         {/* Environment selector */}
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setEnvOpen((o) => !o)}
-            onBlur={() => setTimeout(() => setEnvOpen(false), 120)}
-            className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-surface-panel/60 px-2.5 py-1.5 text-sm hover:bg-surface-hover"
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-glow" />
-            <span className="font-medium">{environment}</span>
-            <span className="font-mono text-xs text-ink-faint">{activeMultiplier.toFixed(1)}×</span>
-            <ChevronDown className="h-3.5 w-3.5 text-ink-faint" />
-          </button>
+        <div className="relative hidden sm:block">
+          <Tooltip label="Traffic environment (peak multiplier)">
+            <button
+              type="button"
+              onClick={() => setEnvOpen((o) => !o)}
+              onBlur={() => setTimeout(() => setEnvOpen(false), 120)}
+              className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-surface-panel/60 px-2.5 py-1.5 text-sm hover:bg-surface-hover"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-glow" />
+              <span className="font-medium">{environment}</span>
+              <span className="font-mono text-xs text-ink-faint">{activeMultiplier.toFixed(1)}×</span>
+              <ChevronDown className="h-3.5 w-3.5 text-ink-faint" />
+            </button>
+          </Tooltip>
           {envOpen && (
             <div className="absolute right-0 top-full z-40 mt-1 w-40 overflow-hidden rounded-xl border border-white/[0.06] bg-surface-panel shadow-panel">
               {environments.map((env) => (
@@ -170,53 +183,85 @@ export function TopBar({ onRun, isRunning, onSave, isSaving }: TopBarProps) {
           )}
         </div>
 
-        <div className="hidden items-center gap-1 sm:flex">
-          <IconButton label={isSaving ? 'Saving…' : 'Save'} shortcut="⌘S" onClick={handleSave}>
-            <Save className={`h-4 w-4 ${isSaving ? 'animate-pulse text-accent' : ''}`} />
-          </IconButton>
-          <IconButton label="Export" onClick={handleExport}><Upload className="h-4 w-4" /></IconButton>
-          <IconButton label="Share" onClick={handleShare}><Share2 className="h-4 w-4" /></IconButton>
+        {/* Actions popover: Save / Export / Share / Report */}
+        <div className="relative">
+          <Tooltip label="Actions">
+            <button
+              type="button"
+              onClick={() => setActionsOpen((o) => !o)}
+              onBlur={() => setTimeout(() => setActionsOpen(false), 150)}
+              className="flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-surface-panel/60 px-2.5 py-1.5 text-sm hover:bg-surface-hover"
+              aria-haspopup="menu"
+              aria-expanded={actionsOpen}
+            >
+              {isSaving ? <Spinner className="h-4 w-4 text-accent" /> : <MoreHorizontal className="h-4 w-4" />}
+              <span className="hidden md:inline">Actions</span>
+            </button>
+          </Tooltip>
+          {actionsOpen && (
+            <div className="absolute right-0 top-full z-40 mt-1 w-52 overflow-hidden rounded-xl border border-white/[0.06] bg-surface-panel py-1 shadow-panel">
+              <ActionItem
+                icon={isSaving ? <Spinner className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+                label={isSaving ? 'Saving…' : 'Save'}
+                shortcut="⌘S"
+                onSelect={runAction(handleSave)}
+              />
+              <ActionItem
+                icon={<Upload className="h-4 w-4" />}
+                label="Export JSON"
+                onSelect={runAction(handleExport)}
+              />
+              <ActionItem
+                icon={<Share2 className="h-4 w-4" />}
+                label="Share link"
+                onSelect={runAction(handleShare)}
+              />
+              <div className="my-1 border-t border-white/[0.06]" />
+              <ActionItem
+                icon={<FileText className="h-4 w-4" />}
+                label="Report"
+                onSelect={runAction(() => setReportOpen(true))}
+              />
+            </div>
+          )}
         </div>
 
-        <button
-          type="button"
-          onClick={() => setReportOpen(true)}
-          className="btn-ghost hidden xl:inline-flex"
-        >
-          <FileText className="h-4 w-4" /> Report
-        </button>
-
-        <button type="button" onClick={onRun} disabled={isRunning} className="btn-primary">
-          <Play className="h-4 w-4" fill="currentColor" />
-          <span className="hidden sm:inline">{isRunning ? 'Running…' : 'Run Simulation'}</span>
-          <span className="ml-0.5 hidden rounded bg-black/20 px-1 font-mono text-[10px] lg:inline">⌘⏎</span>
-        </button>
+        <Tooltip label="Run load simulation (⌘⏎)">
+          <button type="button" onClick={onRun} disabled={isRunning} className="btn-primary">
+            {isRunning ? <Spinner className="h-4 w-4" /> : <Play className="h-4 w-4" fill="currentColor" />}
+            <span className="hidden sm:inline">{isRunning ? 'Running…' : 'Run Simulation'}</span>
+            <span className="ml-0.5 hidden rounded bg-black/20 px-1 font-mono text-[10px] lg:inline">⌘⏎</span>
+          </button>
+        </Tooltip>
 
         {/* Account cluster */}
         <span className="mx-0.5 hidden h-6 w-px bg-white/[0.08] sm:block" />
         {isGuest ? (
-          <button
-            type="button"
-            onClick={() => openAuthPrompt('Sign in to save and sync your architectures.', 'login')}
-            className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-surface-panel/60 px-2.5 py-1.5 text-sm text-ink-muted transition hover:bg-surface-hover hover:text-ink"
-            title={`${guestRunsLeft()} free guest simulations left · sign in for unlimited`}
-          >
-            <LogIn className="h-4 w-4" />
-            <span className="hidden sm:inline">Sign in</span>
-          </button>
+          <Tooltip label={`${guestRunsLeft()} free guest simulations left · sign in for unlimited`}>
+            <button
+              type="button"
+              onClick={() => openAuthPrompt('Sign in to save and sync your architectures.', 'login')}
+              className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-surface-panel/60 px-2.5 py-1.5 text-sm text-ink-muted transition hover:bg-surface-hover hover:text-ink"
+            >
+              <LogIn className="h-4 w-4" />
+              <span className="hidden sm:inline">Sign in</span>
+            </button>
+          </Tooltip>
         ) : (
           <ProfileMenu />
         )}
 
         {/* Inspector toggle (small screens) */}
-        <button
-          type="button"
-          aria-label="Toggle inspector"
-          onClick={() => setInspectorOpen(!inspectorOpen)}
-          className="btn-ghost !px-2 xl:hidden"
-        >
-          <PanelRight className="h-4 w-4" />
-        </button>
+        <Tooltip label="Toggle inspector" side="bottom" className="xl:hidden">
+          <button
+            type="button"
+            aria-label="Toggle inspector"
+            onClick={() => setInspectorOpen(!inspectorOpen)}
+            className="btn-ghost !px-2"
+          >
+            <PanelRight className="h-4 w-4" />
+          </button>
+        </Tooltip>
       </div>
     </header>
   );
@@ -249,26 +294,31 @@ function Tab({
   );
 }
 
-function IconButton({
-  children,
+function ActionItem({
+  icon,
   label,
   shortcut,
-  onClick,
+  onSelect,
 }: {
-  children: React.ReactNode;
+  icon: React.ReactNode;
   label: string;
   shortcut?: string;
-  onClick?: () => void;
+  onSelect: () => void;
 }) {
   return (
     <button
       type="button"
-      onClick={onClick}
-      title={shortcut ? `${label} (${shortcut})` : label}
-      aria-label={label}
-      className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-faint transition hover:bg-surface-hover hover:text-ink"
+      // onMouseDown so the parent button's onBlur (which closes the menu) doesn't
+      // beat the click and swallow the selection.
+      onMouseDown={(e) => {
+        e.preventDefault();
+        onSelect();
+      }}
+      className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-ink-muted transition hover:bg-surface-hover hover:text-ink"
     >
-      {children}
+      <span className="flex h-4 w-4 items-center justify-center text-ink-faint">{icon}</span>
+      <span className="flex-1 text-left">{label}</span>
+      {shortcut && <span className="font-mono text-[10px] text-ink-ghost">{shortcut}</span>}
     </button>
   );
 }

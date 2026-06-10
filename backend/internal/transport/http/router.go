@@ -11,6 +11,7 @@ import (
 	"github.com/scaleforge/scaleforge/internal/config"
 	"github.com/scaleforge/scaleforge/internal/cost"
 	"github.com/scaleforge/scaleforge/internal/middleware"
+	"github.com/scaleforge/scaleforge/internal/pricing"
 	"github.com/scaleforge/scaleforge/internal/repository"
 	"github.com/scaleforge/scaleforge/internal/repository/postgres"
 	"github.com/scaleforge/scaleforge/internal/scoring"
@@ -37,7 +38,8 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 	}))
 
 	catalogService := catalog.NewService()
-	costCalculator := cost.NewCalculator(catalogService)
+	pricingCatalog := pricing.NewCatalog()
+	costCalculator := cost.NewCalculator(catalogService, pricingCatalog)
 	scorer := scoring.NewScorer()
 	simService := simulation.NewService(catalogService, costCalculator, scorer, deps.Store)
 	authService := auth.NewService(deps.Store, cfg.JWTSecret, 0)
@@ -47,6 +49,7 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 	simHandler := NewSimulationHandler(simService, catalogService, achievementsService)
 	authHandler := NewAuthHandler(authService)
 	achievementsHandler := NewAchievementsHandler(achievementsService)
+	pricingHandler := NewPricingHandler(pricingCatalog)
 
 	r.GET("/health", archHandler.Health)
 
@@ -60,7 +63,9 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 	guest.Use(middleware.AuthOptional(authService.Verify))
 	{
 		guest.GET("/catalog", archHandler.GetCatalog)
+		guest.GET("/pricing", pricingHandler.List)
 		guest.POST("/simulate", simHandler.Simulate)
+		guest.POST("/compare", simHandler.Compare)
 	}
 
 	// Account-only: saving/loading architectures and fetching the profile.

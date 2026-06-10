@@ -45,8 +45,37 @@ type TrafficProfile struct {
 type SimulateRequest struct {
 	ArchitectureID *string        `json:"architectureId,omitempty"`
 	Name           string         `json:"name,omitempty"`
+	Provider       string         `json:"provider,omitempty"`
 	Graph          Graph          `json:"graph" binding:"required"`
 	Traffic        TrafficProfile `json:"traffic" binding:"required"`
+}
+
+// CompareScenario is one architecture+traffic+provider combination to evaluate
+// in a comparison. The label is a caller-supplied name (e.g. "AWS" or
+// "Monolith") used to identify the column in the result.
+type CompareScenario struct {
+	Label    string         `json:"label"`
+	Provider string         `json:"provider,omitempty"`
+	Graph    Graph          `json:"graph"`
+	Traffic  TrafficProfile `json:"traffic"`
+}
+
+type CompareRequest struct {
+	Scenarios []CompareScenario `json:"scenarios" binding:"required"`
+}
+
+// ScenarioResult pairs a scenario's label/provider with its computed result.
+type ScenarioResult struct {
+	Label    string `json:"label"`
+	Provider string `json:"provider,omitempty"`
+	Result   Result `json:"result"`
+}
+
+// Comparison is the output of Compare: every scenario's result plus, for each
+// metric, the index of the winning scenario.
+type Comparison struct {
+	Scenarios []ScenarioResult `json:"scenarios"`
+	Winners   map[string]int   `json:"winners"`
 }
 
 type NodeHealth struct {
@@ -68,6 +97,7 @@ type Bottleneck struct {
 type Result struct {
 	ID               string       `json:"id"`
 	ArchitectureID   *string      `json:"architectureId,omitempty"`
+	Provider         string       `json:"provider,omitempty"`
 	EstimatedRPS     float64      `json:"estimatedRps"`
 	IncomingRPS      float64      `json:"incomingRps"`
 	EstimatedLatency float64      `json:"estimatedLatencyMs"`
