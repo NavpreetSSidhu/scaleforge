@@ -212,18 +212,16 @@ transport/http  →  services (simulation, catalog, cost, scoring)  →  reposit
 
 Handlers stay thin: architecture CRUD talks to `ArchitectureRepository`; `/simulate` delegates to `simulation.Service`, which orchestrates the engine, cost calculator, scorer, and persistence.
 
-## Auth (TODO)
+## Authentication
 
-Development mode uses a fixed dev user ID (`DEV_USER_ID` env var). JWT authentication is planned for a future phase.
+ScaleForge uses stateless **JWT (HS256)** auth with an optional, limited guest mode:
 
-## Next Steps
+- `POST /auth/signup` and `POST /auth/login` issue a bearer token; passwords are hashed with **bcrypt**.
+- `GET /auth/me`, all `/architectures*` routes, and `GET /simulation/:id` require a valid token; `/catalog` and `POST /simulate` are guest-allowed (guest simulations are computed but not persisted).
+- Architecture ownership is enforced per authenticated user.
 
-- [ ] JWT authentication and architecture ownership
-- [ ] Achievements and gamification persistence
-- [ ] Full traffic packet animation on edges
-- [ ] Architecture comparison mode
-- [ ] Real cloud pricing integration (AWS/GCP/Azure)
+Set `JWT_SECRET` to a strong value in any non-local deployment — the default in `.env.example` is for development only.
 
 ## License
 
-MIT
+Released under the [MIT License](./LICENSE). See the `LICENSE` file for the full text.
