@@ -93,6 +93,8 @@ var (
 		"object_storage": "S3", "olap_store": "Redshift", "message_queue": "SQS",
 		"event_stream": "MSK (Kafka)", "pubsub": "SNS", "waf": "AWS WAF",
 		"secrets_manager": "Secrets Manager", "monitoring": "CloudWatch",
+		"dns": "Route 53", "container_orchestrator": "EKS", "inference_service": "SageMaker",
+		"llm_provider": "Bedrock", "notification_service": "SNS / SES",
 	}
 	gcpServices = map[string]string{
 		"cdn_edge": "Cloud CDN", "load_balancer": "Cloud Load Balancing", "api_gateway": "API Gateway",
@@ -104,6 +106,8 @@ var (
 		"object_storage": "Cloud Storage", "olap_store": "BigQuery", "message_queue": "Cloud Tasks",
 		"event_stream": "Managed Kafka", "pubsub": "Pub/Sub", "waf": "Cloud Armor",
 		"secrets_manager": "Secret Manager", "monitoring": "Cloud Monitoring",
+		"dns": "Cloud DNS", "container_orchestrator": "GKE", "inference_service": "Vertex AI",
+		"llm_provider": "Vertex AI (Gemini)", "notification_service": "Firebase Cloud Messaging",
 	}
 	azureServices = map[string]string{
 		"cdn_edge": "Front Door / CDN", "load_balancer": "Load Balancer", "api_gateway": "API Management",
@@ -115,6 +119,8 @@ var (
 		"object_storage": "Blob Storage", "olap_store": "Synapse Analytics", "message_queue": "Service Bus",
 		"event_stream": "Event Hubs", "pubsub": "Event Grid", "waf": "Azure WAF",
 		"secrets_manager": "Key Vault", "monitoring": "Azure Monitor",
+		"dns": "Azure DNS", "container_orchestrator": "AKS", "inference_service": "Azure ML",
+		"llm_provider": "Azure OpenAI", "notification_service": "Notification Hubs",
 	}
 )
 

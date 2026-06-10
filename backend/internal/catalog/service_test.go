@@ -5,10 +5,11 @@ import "testing"
 func TestAllContainsEverySpecNodeType(t *testing.T) {
 	// The full set of node types offered in the builder (per the product design).
 	want := []string{
-		"cdn_edge", "load_balancer", "api_gateway", "websocket_gateway",
+		"dns", "cdn_edge", "load_balancer", "api_gateway", "websocket_gateway",
 		"api_service", "microservice", "grpc_service", "auth_service", "payment_service", "search_service", "worker_pool", "serverless_fn",
+		"container_orchestrator", "inference_service", "llm_provider",
 		"sql_primary", "read_replica", "document_db", "vector_db", "timeseries_db", "redis_cache", "object_storage", "olap_store",
-		"message_queue", "event_stream", "pubsub",
+		"message_queue", "event_stream", "pubsub", "notification_service",
 		"waf", "secrets_manager",
 		"monitoring",
 	}

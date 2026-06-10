@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, type DragEvent } from 'react';
 import ReactFlow, {
   Background,
   BackgroundVariant,
   Controls,
   MiniMap,
   useNodesState,
+  useReactFlow,
   type Connection,
   type Edge,
   type EdgeChange,
@@ -68,6 +69,7 @@ export function Canvas() {
     nodes: storeNodes,
     edges: storeEdges,
     setNodes,
+    addNode,
     addEdge,
     removeEdge,
     removeNode,
@@ -75,6 +77,8 @@ export function Canvas() {
     loadDemo,
     simulationResult,
   } = useArchitectureStore();
+
+  const { screenToFlowPosition } = useReactFlow();
 
   const { data: catalog } = useQuery({
     queryKey: ['catalog'],
@@ -192,8 +196,26 @@ export function Canvas() {
     [selectNode],
   );
 
+  const onDragOver = useCallback((e: DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  // Drop a component dragged from the library at the cursor's canvas position.
+  const onDrop = useCallback(
+    (e: DragEvent) => {
+      e.preventDefault();
+      const type = e.dataTransfer.getData('application/scaleforge-node');
+      const def = catalog?.find((d) => d.type === type);
+      if (!def) return;
+      const point = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      addNode(def, { x: point.x - NODE_W / 2, y: point.y - NODE_H / 2 });
+    },
+    [catalog, screenToFlowPosition, addNode],
+  );
+
   return (
-    <div className="relative h-full w-full overflow-hidden">
+    <div className="relative h-full w-full overflow-hidden" onDragOver={onDragOver} onDrop={onDrop}>
       <ReactFlow
         nodes={rfNodes}
         edges={flowEdges}
@@ -235,7 +257,7 @@ export function Canvas() {
           <p className="text-sm text-ink-faint">
             Add components from the library to start designing
           </p>
-          <p className="text-xs text-ink-ghost">double-click a component · pull handles to connect</p>
+          <p className="text-xs text-ink-ghost">drag a component in (or double-click) · pull handles to connect</p>
           <button type="button" onClick={loadDemo} className="btn-ghost mt-1">
             Load demo architecture
           </button>
@@ -243,7 +265,7 @@ export function Canvas() {
       )}
 
       <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-white/[0.06] bg-surface-panel/80 px-3 py-1 text-[11px] text-ink-faint backdrop-blur">
-        double-click to add · pull to connect · click an edge to delete
+        drag or double-click to add · pull to connect · click an edge to delete
       </div>
     </div>
   );

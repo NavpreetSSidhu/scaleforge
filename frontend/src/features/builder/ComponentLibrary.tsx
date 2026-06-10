@@ -88,7 +88,7 @@ export function ComponentLibrary() {
 
       <div className="flex items-center justify-between border-t border-white/[0.06] px-4 py-2.5 text-[11px] text-ink-faint">
         <span>{total} components</span>
-        <span>double-click to add →</span>
+        <span>drag or click to add →</span>
       </div>
     </div>
   );
@@ -101,10 +101,15 @@ function ComponentCard({ def, onAdd }: { def: NodeDefinition; onAdd: () => void 
   return (
     <button
       type="button"
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('application/scaleforge-node', def.type);
+        e.dataTransfer.effectAllowed = 'copy';
+      }}
       onDoubleClick={onAdd}
       onClick={onAdd}
-      title={`${def.description} · click to add`}
-      className="group flex items-center gap-2.5 rounded-lg border border-white/[0.05] bg-surface-panel/50 px-2.5 py-2 text-left transition hover:border-white/10 hover:bg-surface-hover"
+      title={`${def.description} · drag onto canvas or click to add`}
+      className="group flex cursor-grab items-center gap-2.5 rounded-lg border border-white/[0.05] bg-surface-panel/50 px-2.5 py-2 text-left transition hover:border-white/10 hover:bg-surface-hover active:cursor-grabbing"
     >
       <span
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"

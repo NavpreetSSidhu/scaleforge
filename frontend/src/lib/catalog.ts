@@ -1,8 +1,11 @@
 import {
+  Bell,
   Binary,
   Boxes,
   Brain,
+  BrainCircuit,
   Cloud,
+  Container,
   Cpu,
   Database,
   Gauge,
@@ -17,10 +20,12 @@ import {
   Megaphone,
   Network,
   Radio,
+  Route,
   Search,
   Server,
   ShieldAlert,
   ShieldCheck,
+  Sparkles,
   Webhook,
   Workflow,
   Zap,
@@ -55,6 +60,7 @@ export function categoryStyle(category: string): CategoryStyle {
 
 /** Per-type icon. Falls back to a category icon, then a generic box. */
 const typeIcons: Record<string, LucideIcon> = {
+  dns: Route,
   cdn_edge: Globe,
   load_balancer: Network,
   api_gateway: Workflow,
@@ -67,6 +73,10 @@ const typeIcons: Record<string, LucideIcon> = {
   search_service: Search,
   worker_pool: Cpu,
   serverless_fn: Zap,
+  container_orchestrator: Container,
+  inference_service: BrainCircuit,
+  llm_provider: Sparkles,
+  notification_service: Bell,
   sql_primary: Database,
   read_replica: GitBranch,
   document_db: Leaf,

@@ -21,6 +21,7 @@ func NewService() *Service {
 func (s *Service) All() []NodeDefinition {
 	return []NodeDefinition{
 		// Edge & Network
+		{Type: "dns", Category: CategoryEdge, Group: GroupEdge, Label: "DNS", Description: "Domain resolution & anycast traffic routing", BaseLatencyMs: 1, PerInstanceCapacity: 200000, UnitMonthlyCostUsd: 10, DefaultConfig: defaultConfig(1, 1, 1, false)},
 		{Type: "cdn_edge", Category: CategoryEdge, Group: GroupEdge, Label: "CDN Edge", Description: "Caches & serves static assets at the edge", BaseLatencyMs: 5, PerInstanceCapacity: 100000, UnitMonthlyCostUsd: 20, DefaultConfig: defaultConfig(2, 2, 1, false)},
 		{Type: "load_balancer", Category: CategoryEdge, Group: GroupEdge, Label: "Load Balancer", Description: "Distributes traffic across upstreams", BaseLatencyMs: 2, PerInstanceCapacity: 50000, UnitMonthlyCostUsd: 30, DefaultConfig: defaultConfig(2, 4, 2, true)},
 		{Type: "api_gateway", Category: CategoryEdge, Group: GroupEdge, Label: "API Gateway", Description: "Routing, rate-limiting, auth offload", BaseLatencyMs: 3, PerInstanceCapacity: 40000, UnitMonthlyCostUsd: 35, DefaultConfig: defaultConfig(2, 4, 2, true)},
@@ -35,6 +36,9 @@ func (s *Service) All() []NodeDefinition {
 		{Type: "search_service", Category: CategoryCompute, Group: GroupCompute, Label: "Search Service", Description: "Query parsing & ranking", BaseLatencyMs: 30, PerInstanceCapacity: 1200, UnitMonthlyCostUsd: 55, DefaultConfig: defaultConfig(4, 8, 2, true)},
 		{Type: "worker_pool", Category: CategoryCompute, Group: GroupCompute, Label: "Worker Pool", Description: "Async job & batch processing", BaseLatencyMs: 10, PerInstanceCapacity: 5000, UnitMonthlyCostUsd: 30, DefaultConfig: defaultConfig(2, 4, 3, true)},
 		{Type: "serverless_fn", Category: CategoryCompute, Group: GroupCompute, Label: "Serverless Fn", Description: "Event-driven functions, scale-to-zero", BaseLatencyMs: 35, PerInstanceCapacity: 2000, UnitMonthlyCostUsd: 15, DefaultConfig: defaultConfig(1, 2, 1, true)},
+		{Type: "container_orchestrator", Category: CategoryCompute, Group: GroupCompute, Label: "Container Orchestrator", Description: "Kubernetes-style scheduling & service platform", BaseLatencyMs: 1, PerInstanceCapacity: 60000, UnitMonthlyCostUsd: 70, DefaultConfig: defaultConfig(2, 4, 3, false)},
+		{Type: "inference_service", Category: CategoryCompute, Group: GroupCompute, Label: "ML Inference", Description: "GPU model serving & batch inference", BaseLatencyMs: 60, PerInstanceCapacity: 800, UnitMonthlyCostUsd: 120, DefaultConfig: defaultConfig(8, 32, 2, true)},
+		{Type: "llm_provider", Category: CategoryCompute, Group: GroupCompute, Label: "LLM Provider", Description: "Hosted LLM API with token streaming", BaseLatencyMs: 250, PerInstanceCapacity: 500, UnitMonthlyCostUsd: 200, DefaultConfig: defaultConfig(1, 1, 1, false)},
 
 		// Data Stores
 		{Type: "sql_primary", Category: CategoryDatabase, Group: GroupData, Label: "SQL Primary", Description: "Primary OLTP write node", BaseLatencyMs: 8, PerInstanceCapacity: 1500, UnitMonthlyCostUsd: 50, DefaultConfig: defaultConfig(8, 32, 1, false)},
@@ -50,6 +54,7 @@ func (s *Service) All() []NodeDefinition {
 		{Type: "message_queue", Category: CategoryMessaging, Group: GroupMessaging, Label: "Message Queue", Description: "Durable task queue (SQS-style)", BaseLatencyMs: 6, PerInstanceCapacity: 25000, UnitMonthlyCostUsd: 10, DefaultConfig: defaultConfig(2, 4, 3, false)},
 		{Type: "event_stream", Category: CategoryMessaging, Group: GroupMessaging, Label: "Event Stream", Description: "Partitioned log (Kafka-style)", BaseLatencyMs: 4, PerInstanceCapacity: 30000, UnitMonthlyCostUsd: 60, DefaultConfig: defaultConfig(4, 8, 3, false)},
 		{Type: "pubsub", Category: CategoryMessaging, Group: GroupMessaging, Label: "Pub/Sub", Description: "Topic-based publish/subscribe fan-out", BaseLatencyMs: 5, PerInstanceCapacity: 50000, UnitMonthlyCostUsd: 25, DefaultConfig: defaultConfig(2, 4, 3, false)},
+		{Type: "notification_service", Category: CategoryMessaging, Group: GroupMessaging, Label: "Notification Service", Description: "Email / SMS / push delivery fan-out", BaseLatencyMs: 8, PerInstanceCapacity: 20000, UnitMonthlyCostUsd: 15, DefaultConfig: defaultConfig(2, 4, 2, true)},
 
 		// Security
 		{Type: "waf", Category: CategorySecurity, Group: GroupSecurity, Label: "WAF", Description: "Web app firewall & bot mitigation", BaseLatencyMs: 3, PerInstanceCapacity: 80000, UnitMonthlyCostUsd: 30, DefaultConfig: defaultConfig(2, 4, 2, true)},
