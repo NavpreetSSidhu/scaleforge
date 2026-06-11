@@ -1,0 +1,27 @@
+# Requires an Ingress controller (e.g. ingress-nginx) and cert-manager for TLS.
+# Update host and TLS secret name to match your domain.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: scaleforge-ingress
+  namespace: scaleforge
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/cluster-issuer: letsencrypt-prod   # remove if not using cert-manager
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - scaleforge.example.com
+      secretName: scaleforge-tls
+  rules:
+    - host: scaleforge.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: scaleforge-frontend
+                port:
+                  number: 80

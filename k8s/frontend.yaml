@@ -1,0 +1,81 @@
+# The frontend is a static Vite build served by nginx.
+# Build the image:
+#   docker build -t scaleforge-frontend:latest ./frontend
+# Then push to your registry and update the image field below.
+#
+# The nginx config below reverse-proxies /api/* to the backend service,
+# matching the same behaviour as the Vite dev-server proxy.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-nginx-conf
+  namespace: scaleforge
+data:
+  default.conf: |
+    server {
+        listen 80;
+        root /usr/share/nginx/html;
+        index index.html;
+
+        # SPA fallback
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+
+        # Proxy API calls to backend
+        location /api/ {
+            rewrite ^/api/(.*) /$1 break;
+            proxy_pass http://scaleforge-backend:8080;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scaleforge-frontend
+  namespace: scaleforge
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: scaleforge-frontend
+  template:
+    metadata:
+      labels:
+        app: scaleforge-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: scaleforge-frontend:latest   # replace with your registry path
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: nginx-conf
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      volumes:
+        - name: nginx-conf
+          configMap:
+            name: frontend-nginx-conf
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scaleforge-frontend
+  namespace: scaleforge
+spec:
+  selector:
+    app: scaleforge-frontend
+  ports:
+    - port: 80
+      targetPort: 80

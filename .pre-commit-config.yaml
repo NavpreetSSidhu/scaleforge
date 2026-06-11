@@ -1,0 +1,43 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.5.1
+    hooks:
+      - id: go-fmt
+        files: ^backend/
+      - id: go-vet
+        files: ^backend/
+      - id: go-unit-tests
+        files: ^backend/
+
+  - repo: local
+    hooks:
+      - id: frontend-typecheck
+        name: TypeScript type check
+        language: system
+        entry: bash -c 'cd frontend && bunx tsc --noEmit'
+        files: ^frontend/.*\.(ts|tsx)$
+        pass_filenames: false
+
+      - id: frontend-lint
+        name: ESLint
+        language: system
+        entry: bash -c 'cd frontend && bun run lint'
+        files: ^frontend/.*\.(ts|tsx)$
+        pass_filenames: false
+
+      - id: frontend-tests
+        name: Vitest
+        language: system
+        entry: bash -c 'cd frontend && bun run test --run'
+        files: ^frontend/.*\.(ts|tsx)$
+        pass_filenames: false

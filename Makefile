@@ -1,4 +1,4 @@
-.PHONY: db-up db-down backend frontend dev migrate build-backend
+.PHONY: db-up db-down backend frontend dev migrate build-backend docker-up docker-down
 
 db-up:
 	docker compose up -d postgres adminer
@@ -24,3 +24,9 @@ build-backend:
 
 build-frontend:
 	cd frontend && bun run build
+
+docker-up:
+	docker compose up --build -d
+
+docker-down:
+	docker compose down
