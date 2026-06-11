@@ -3,14 +3,19 @@ import { Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { categoryStyle, iconFor } from '@/lib/catalog';
 import { compact, compactUsd } from '@/lib/format';
+import { useRuntimes } from '@/features/shell/useRuntimes';
 import { useArchitectureStore } from '@/store/architectureStore';
 import type { GraphNode, NodeDefinition } from '@/types/domain';
 
-function nodeCapacity(def: NodeDefinition | undefined, config: GraphNode['config']): number {
+function nodeCapacity(
+  def: NodeDefinition | undefined,
+  config: GraphNode['config'],
+  runtimeFactor = 1,
+): number {
   if (!def) return 0;
   const replicas = config.replicas > 0 ? config.replicas : 1;
   const cpuMultiplier = config.cpu > 0 ? config.cpu / 2 : 1;
-  return def.perInstanceCapacityRps * replicas * cpuMultiplier;
+  return def.perInstanceCapacityRps * replicas * cpuMultiplier * runtimeFactor;
 }
 
 function nodeCost(def: NodeDefinition | undefined, config: GraphNode['config']): number {
@@ -25,10 +30,21 @@ export function NodeProperties({ node }: { node: GraphNode }) {
     queryFn: async () => (await api.getCatalog()).nodes,
   });
 
+  const { data: runtimeCatalog } = useRuntimes();
+
   const def = catalog?.find((d) => d.type === node.type);
   const category = def?.category ?? 'compute';
   const style = categoryStyle(category);
   const Icon = iconFor(node.type, category);
+
+  // Runtime only meaningfully applies to compute components (the user's code).
+  const isCompute = category === 'compute';
+  const runtimes = runtimeCatalog?.runtimes ?? [];
+  const defaultRuntimeId = runtimeCatalog?.defaultRuntimeId ?? 'go';
+  const selectedRuntime = node.config.runtime || defaultRuntimeId;
+  const runtimeFactor = isCompute
+    ? runtimes.find((r) => r.id === selectedRuntime)?.throughputFactor ?? 1
+    : 1;
 
   return (
     <div className="space-y-4">
@@ -46,7 +62,7 @@ export function NodeProperties({ node }: { node: GraphNode }) {
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <Stat label="Capacity" value={`${compact(nodeCapacity(def, node.config))} rps`} accent={style.accent} />
+        <Stat label="Capacity" value={`${compact(nodeCapacity(def, node.config, runtimeFactor))} rps`} accent={style.accent} />
         <Stat label="Cost" value={`${compactUsd(nodeCost(def, node.config))}/mo`} />
       </div>
 
@@ -58,6 +74,22 @@ export function NodeProperties({ node }: { node: GraphNode }) {
           className="input"
         />
       </Field>
+
+      {isCompute && runtimes.length > 0 && (
+        <Field label="Runtime / language">
+          <select
+            value={selectedRuntime}
+            onChange={(e) => updateNodeConfig(node.id, { runtime: e.target.value })}
+            className="input"
+          >
+            {runtimes.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="vCPU">

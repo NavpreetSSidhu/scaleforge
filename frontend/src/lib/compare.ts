@@ -4,6 +4,7 @@ import type {
   Comparison,
   Graph,
   PricingProvider,
+  Runtime,
   SimulationResult,
   TrafficProfile,
 } from '@/types/domain';
@@ -75,4 +76,30 @@ export function providerScenarios(
   providers: PricingProvider[],
 ): CompareScenario[] {
   return providers.map((p) => ({ label: p.label, provider: p.id, graph, traffic }));
+}
+
+/**
+ * Build one comparison scenario per language/runtime from a single architecture.
+ * Only compute-category nodes (the code the user writes) get the runtime stamped;
+ * managed components are left untouched, so the runtime is the only variable. The
+ * cloud provider and traffic stay fixed across scenarios.
+ */
+export function runtimeScenarios(
+  graph: Graph,
+  traffic: TrafficProfile,
+  provider: string,
+  runtimes: Runtime[],
+  computeTypes: Set<string>,
+): CompareScenario[] {
+  return runtimes.map((rt) => ({
+    label: rt.label,
+    provider,
+    graph: {
+      nodes: graph.nodes.map((n) =>
+        computeTypes.has(n.type) ? { ...n, config: { ...n.config, runtime: rt.id } } : n,
+      ),
+      edges: graph.edges,
+    },
+    traffic,
+  }));
 }

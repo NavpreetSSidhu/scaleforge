@@ -4,6 +4,8 @@ export interface NodeConfig {
   replicas: number;
   autoscaling: boolean;
   region?: string;
+  /** Language/runtime for compute components (e.g. "go", "rust"). */
+  runtime?: string;
 }
 
 export interface Position {
@@ -172,4 +174,60 @@ export interface Architecture {
   traffic: TrafficProfile;
   createdAt: string;
   updatedAt: string;
+}
+
+/** A language/runtime and its performance multipliers, relative to Go (= 1.0). */
+export interface Runtime {
+  id: string;
+  label: string;
+  throughputFactor: number;
+  latencyFactor: number;
+  memoryFactor: number;
+}
+
+export interface RuntimeCatalog {
+  runtimes: Runtime[];
+  defaultRuntimeId: string;
+  provenance: string;
+}
+
+// --- AI assistant ---
+
+export type AssistantOp =
+  | 'addNode'
+  | 'removeNode'
+  | 'addEdge'
+  | 'removeEdge'
+  | 'updateConfig';
+
+/** One proposed graph mutation from the assistant, previewed before it applies. */
+export interface AssistantAction {
+  op: AssistantOp;
+  nodeType?: string;
+  nodeId?: string;
+  label?: string;
+  source?: string;
+  target?: string;
+  config?: Partial<NodeConfig>;
+  rationale?: string;
+}
+
+export interface AssistantResponse {
+  reply: string;
+  actions: AssistantAction[];
+}
+
+/** One turn of assistant conversation sent back as context. */
+export interface AssistantMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AssistantRequest {
+  message: string;
+  graph: Graph;
+  traffic: TrafficProfile;
+  provider?: string;
+  result?: SimulationResult | null;
+  history?: AssistantMessage[];
 }

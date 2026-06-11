@@ -40,4 +40,5 @@ type NodeConfig struct {
 	Replicas    int    `json:"replicas"`
 	Autoscaling bool   `json:"autoscaling"`
 	Region      string `json:"region,omitempty"`
+	Runtime     string `json:"runtime,omitempty"`
 }

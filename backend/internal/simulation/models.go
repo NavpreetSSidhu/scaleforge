@@ -8,6 +8,9 @@ type NodeConfig struct {
 	Replicas    int    `json:"replicas"`
 	Autoscaling bool   `json:"autoscaling"`
 	Region      string `json:"region,omitempty"`
+	// Runtime is the language/runtime a compute component is built in (e.g. "go",
+	// "rust"). Empty means the Go baseline. Only affects compute-category nodes.
+	Runtime string `json:"runtime,omitempty"`
 }
 
 type Node struct {

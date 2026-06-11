@@ -11,6 +11,7 @@ import { DashboardView } from '@/features/dashboard/DashboardView';
 import { CompareView } from '@/features/compare/CompareView';
 import { MobileView } from '@/features/mobile/MobileView';
 import { ReportDrawer } from '@/features/report/ReportDrawer';
+import { AssistantDrawer } from '@/features/assistant/AssistantDrawer';
 import { AuthModal } from '@/features/auth/AuthModal';
 import { AchievementToaster } from '@/features/achievements/AchievementToast';
 import { Snackbar } from '@/components/Snackbar';
@@ -167,6 +168,7 @@ export default function App() {
       {view === 'mobile' && <MobileView onRun={runSimulation} isRunning={simulate.isPending} />}
 
       <ReportDrawer />
+      <AssistantDrawer onRun={runSimulation} />
       <AuthModal />
       <AchievementToaster />
       <Snackbar />

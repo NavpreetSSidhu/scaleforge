@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, Crown, GitCompareArrows, Layers, Trophy } from 'lucide-react';
+import { ArrowDown, ArrowUp, Code2, Crown, GitCompareArrows, Layers, Trophy } from 'lucide-react';
 import { api } from '@/lib/api';
-import { isWinner, metricRows, providerScenarios, winTally } from '@/lib/compare';
+import { isWinner, metricRows, providerScenarios, runtimeScenarios, winTally } from '@/lib/compare';
 import { usePricing, providerLabel } from '@/features/shell/ProviderSelector';
+import { useRuntimes } from '@/features/shell/useRuntimes';
 import { useArchitectureStore } from '@/store/architectureStore';
 import { useAuthStore } from '@/store/authStore';
-import type { CompareScenario, Comparison, PricingProvider } from '@/types/domain';
+import type { CompareScenario, Comparison, PricingProvider, Runtime } from '@/types/domain';
 
-type Mode = 'providers' | 'architectures';
+type Mode = 'providers' | 'architectures' | 'runtimes';
 
 export function CompareView() {
   const { name, provider, nodes, edges, traffic, setView } = useArchitectureStore();
@@ -16,6 +17,8 @@ export function CompareView() {
   const isGuest = user == null;
   const { data: pricing } = usePricing();
   const providers = pricing?.providers ?? [];
+  const { data: runtimeCatalog } = useRuntimes();
+  const runtimes = runtimeCatalog?.runtimes ?? [];
 
   const [mode, setMode] = useState<Mode>('providers');
   const [challengerId, setChallengerId] = useState<string | null>(null);
@@ -26,14 +29,32 @@ export function CompareView() {
     enabled: !isGuest,
   });
 
+  const { data: catalog = [] } = useQuery({
+    queryKey: ['catalog'],
+    queryFn: async () => (await api.getCatalog()).nodes,
+    staleTime: Infinity,
+  });
+
+  // The set of compute component types — only these get a runtime stamped.
+  const computeTypes = useMemo(
+    () => new Set(catalog.filter((d) => d.category === 'compute').map((d) => d.type)),
+    [catalog],
+  );
+
   const graph = useMemo(() => ({ nodes, edges }), [nodes, edges]);
   const canvasEmpty = nodes.length === 0;
+  const hasComputeNode = nodes.some((n) => computeTypes.has(n.type));
 
   // Build the scenario list for the active mode.
   const scenarios = useMemo<CompareScenario[]>(() => {
     if (canvasEmpty) return [];
     if (mode === 'providers') {
       return providers.length > 0 ? providerScenarios(graph, traffic, providers) : [];
+    }
+    if (mode === 'runtimes') {
+      return runtimes.length > 0
+        ? runtimeScenarios(graph, traffic, provider, runtimes, computeTypes)
+        : [];
     }
     // architectures mode: current canvas vs a chosen saved architecture. Both
     // are priced on the selected provider AND run under the *current* traffic
@@ -48,7 +69,19 @@ export function CompareView() {
     const challenger = architectures.find((a) => a.id === challengerId);
     if (!challenger) return [current];
     return [current, { label: challenger.name, provider, graph: challenger.graph, traffic }];
-  }, [canvasEmpty, mode, providers, graph, traffic, name, provider, architectures, challengerId]);
+  }, [
+    canvasEmpty,
+    mode,
+    providers,
+    runtimes,
+    computeTypes,
+    graph,
+    traffic,
+    name,
+    provider,
+    architectures,
+    challengerId,
+  ]);
 
   const compare = useMutation({
     mutationFn: (payload: CompareScenario[]) => api.compare({ scenarios: payload }),
@@ -88,6 +121,12 @@ export function CompareView() {
             label="Across cloud providers"
           />
           <ModeButton
+            active={mode === 'runtimes'}
+            onClick={() => setMode('runtimes')}
+            icon={<Code2 className="h-4 w-4" />}
+            label="Across runtimes"
+          />
+          <ModeButton
             active={mode === 'architectures'}
             onClick={() => setMode('architectures')}
             icon={<GitCompareArrows className="h-4 w-4" />}
@@ -115,6 +154,16 @@ export function CompareView() {
           <EmptyState
             title="Nothing to compare yet"
             body="Build or load an architecture in the Builder, then come back to compare it."
+            action={
+              <button type="button" onClick={() => setView('builder')} className="btn-primary">
+                Go to Builder
+              </button>
+            }
+          />
+        ) : mode === 'runtimes' && !hasComputeNode ? (
+          <EmptyState
+            title="Add a compute component"
+            body="Runtime comparison varies the language your services run in (Go, Rust, Node…). Add a compute component — an API service, microservice, worker, etc. — to compare runtimes."
             action={
               <button type="button" onClick={() => setView('builder')} className="btn-primary">
                 Go to Builder
@@ -151,12 +200,20 @@ export function CompareView() {
             <p className="mb-3 text-xs text-ink-faint">
               {mode === 'providers'
                 ? 'Same architecture and traffic, priced against each provider’s curated rates. Identical metrics (a tie) are left unhighlighted — only genuine differences win.'
-                : `Both architectures run under the current traffic profile and priced on ${providerLabel(
-                    providers,
-                    provider,
-                  )}, so the architecture is the only variable.`}
+                : mode === 'runtimes'
+                  ? `Same architecture and traffic on ${providerLabel(
+                      providers,
+                      provider,
+                    )}; only the language/runtime of your compute components changes, so throughput, latency, and the scores that depend on them shift per runtime.`
+                  : `Both architectures run under the current traffic profile and priced on ${providerLabel(
+                      providers,
+                      provider,
+                    )}, so the architecture is the only variable.`}
             </p>
             <ComparisonMatrix comparison={result} providers={providers} />
+            {mode === 'runtimes' && (
+              <RuntimeLegend runtimes={runtimes} provenance={runtimeCatalog?.provenance} />
+            )}
           </>
         ) : null}
       </div>
@@ -243,6 +300,51 @@ function ComparisonMatrix({
           </tr>
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function RuntimeLegend({
+  runtimes,
+  provenance,
+}: {
+  runtimes: Runtime[];
+  provenance?: string;
+}) {
+  return (
+    <div className="mt-4 rounded-2xl border border-white/[0.06] bg-surface/40 p-4">
+      <div className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+        <Code2 className="h-3.5 w-3.5" /> Runtime coefficients (relative to Go = 1.0)
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-[11px] uppercase tracking-wider text-ink-faint">
+              <th className="px-2 py-1 text-left font-medium">Runtime</th>
+              <th className="px-2 py-1 text-right font-medium">Throughput</th>
+              <th className="px-2 py-1 text-right font-medium">Latency</th>
+              <th className="px-2 py-1 text-right font-medium">Memory</th>
+            </tr>
+          </thead>
+          <tbody>
+            {runtimes.map((r) => (
+              <tr key={r.id} className="border-t border-white/[0.04]">
+                <td className="px-2 py-1.5 text-ink">{r.label}</td>
+                <td className="px-2 py-1.5 text-right font-mono text-ink-muted">
+                  {r.throughputFactor.toFixed(2)}×
+                </td>
+                <td className="px-2 py-1.5 text-right font-mono text-ink-muted">
+                  {r.latencyFactor.toFixed(2)}×
+                </td>
+                <td className="px-2 py-1.5 text-right font-mono text-ink-muted">
+                  {r.memoryFactor.toFixed(2)}×
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {provenance && <p className="mt-3 text-[11px] leading-relaxed text-ink-ghost">{provenance}</p>}
     </div>
   );
 }

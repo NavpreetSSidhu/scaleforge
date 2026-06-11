@@ -6,6 +6,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/scaleforge/scaleforge/internal/achievements"
+	"github.com/scaleforge/scaleforge/internal/assist"
 	"github.com/scaleforge/scaleforge/internal/auth"
 	"github.com/scaleforge/scaleforge/internal/catalog"
 	"github.com/scaleforge/scaleforge/internal/config"
@@ -14,6 +15,7 @@ import (
 	"github.com/scaleforge/scaleforge/internal/pricing"
 	"github.com/scaleforge/scaleforge/internal/repository"
 	"github.com/scaleforge/scaleforge/internal/repository/postgres"
+	runtimepkg "github.com/scaleforge/scaleforge/internal/runtime"
 	"github.com/scaleforge/scaleforge/internal/scoring"
 	"github.com/scaleforge/scaleforge/internal/simulation"
 )
@@ -45,17 +47,34 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 	authService := auth.NewService(deps.Store, cfg.JWTSecret, 0)
 	achievementsService := achievements.NewService(deps.Store)
 
+	// The assistant is enabled only when an LLM API key is configured; otherwise
+	// the service is constructed with a nil provider and reports itself disabled.
+	var assistProvider assist.Provider
+	if cfg.GroqAPIKey != "" {
+		assistProvider = assist.NewGroqProvider(cfg.GroqAPIKey, cfg.AssistModel)
+	}
+	assistService := assist.NewService(assistProvider, catalogService)
+
 	archHandler := NewArchitectureHandler(deps.Store, catalogService, deps.Store)
 	simHandler := NewSimulationHandler(simService, catalogService, achievementsService)
 	authHandler := NewAuthHandler(authService)
 	achievementsHandler := NewAchievementsHandler(achievementsService)
 	pricingHandler := NewPricingHandler(pricingCatalog)
+	runtimeHandler := NewRuntimeHandler(runtimepkg.NewCatalog())
+	assistHandler := NewAssistHandler(assistService)
+
+	// Per-IP rate limiters guarding the endpoints worth protecting: auth (brute
+	// force / account enumeration) and the compute-heavy simulation endpoints.
+	// Read-only catalog/pricing/runtimes browsing is left unthrottled; the
+	// assistant has its own limiter (it checks "configured?" before counting).
+	authLimiter := middleware.NewIPRateLimiter(10, time.Minute)
+	simLimiter := middleware.NewIPRateLimiter(60, time.Minute)
 
 	r.GET("/health", archHandler.Health)
 
-	// Public auth endpoints.
-	r.POST("/auth/signup", authHandler.Signup)
-	r.POST("/auth/login", authHandler.Login)
+	// Public auth endpoints (rate-limited to blunt brute-force attempts).
+	r.POST("/auth/signup", authLimiter.Middleware(), authHandler.Signup)
+	r.POST("/auth/login", authLimiter.Middleware(), authHandler.Login)
 
 	// Guest-friendly: catalog browsing and running simulations work signed out
 	// (simulations just aren't persisted). A valid token is attached when present.
@@ -64,8 +83,11 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 	{
 		guest.GET("/catalog", archHandler.GetCatalog)
 		guest.GET("/pricing", pricingHandler.List)
-		guest.POST("/simulate", simHandler.Simulate)
-		guest.POST("/compare", simHandler.Compare)
+		guest.GET("/runtimes", runtimeHandler.List)
+		guest.POST("/simulate", simLimiter.Middleware(), simHandler.Simulate)
+		guest.POST("/compare", simLimiter.Middleware(), simHandler.Compare)
+		guest.GET("/assistant", assistHandler.Status)
+		guest.POST("/assistant", assistHandler.Chat)
 	}
 
 	// Account-only: saving/loading architectures and fetching the profile.

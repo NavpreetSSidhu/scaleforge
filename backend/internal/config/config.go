@@ -13,6 +13,10 @@ type Config struct {
 	GinMode     string
 	DevUserID   string
 	JWTSecret   string
+	// GroqAPIKey enables the AI assistant when set. Empty disables the feature.
+	GroqAPIKey string
+	// AssistModel overrides the LLM model used by the assistant.
+	AssistModel string
 }
 
 func Load() (*Config, error) {
@@ -25,6 +29,8 @@ func Load() (*Config, error) {
 		GinMode:     getEnv("GIN_MODE", "debug"),
 		DevUserID:   getEnv("DEV_USER_ID", "00000000-0000-0000-0000-000000000001"),
 		JWTSecret:   getEnv("JWT_SECRET", "dev-insecure-secret-change-me"),
+		GroqAPIKey:  getEnv("GROQ_API_KEY", ""),
+		AssistModel: getEnv("ASSIST_MODEL", ""),
 	}
 
 	return cfg, nil

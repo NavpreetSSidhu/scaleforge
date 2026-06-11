@@ -15,13 +15,16 @@ import {
   PanelRight,
   LogIn,
   MoreHorizontal,
+  Sparkles,
 } from 'lucide-react';
 import { useArchitectureStore, type AppView } from '@/store/architectureStore';
 import { useAuthStore } from '@/store/authStore';
+import { useAssistantStore } from '@/store/assistantStore';
 import { useSnackbar } from '@/store/snackbarStore';
 import { buildShareLink, downloadArchitecture } from '@/lib/share';
 import { ProfileMenu } from '@/features/auth/ProfileMenu';
 import { ProviderSelector } from '@/features/shell/ProviderSelector';
+import { useAssistantEnabled } from '@/features/assistant/AssistantDrawer';
 import { Tooltip } from '@/components/Tooltip';
 import { Spinner } from '@/components/Spinner';
 
@@ -63,6 +66,8 @@ export function TopBar({ onRun, isRunning, onSave, isSaving }: TopBarProps) {
     setInspectorOpen,
   } = useArchitectureStore();
   const { user, openAuthPrompt, guestRunsLeft } = useAuthStore();
+  const toggleAssistant = useAssistantStore((s) => s.toggle);
+  const assistantEnabled = useAssistantEnabled();
   const pushSnack = useSnackbar((s) => s.push);
   const isGuest = user == null;
   const [envOpen, setEnvOpen] = useState(false);
@@ -225,6 +230,20 @@ export function TopBar({ onRun, isRunning, onSave, isSaving }: TopBarProps) {
             </div>
           )}
         </div>
+
+        {assistantEnabled && (
+          <Tooltip label="AI architecture assistant">
+            <button
+              type="button"
+              aria-label="Open AI assistant"
+              onClick={toggleAssistant}
+              className="flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/10 px-2.5 py-1.5 text-sm text-accent transition hover:bg-accent/20"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden lg:inline">Assistant</span>
+            </button>
+          </Tooltip>
+        )}
 
         <Tooltip label="Run load simulation (⌘⏎)">
           <button type="button" onClick={onRun} disabled={isRunning} className="btn-primary">

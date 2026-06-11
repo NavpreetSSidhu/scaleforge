@@ -6,7 +6,14 @@ import (
 	"sort"
 
 	"github.com/scaleforge/scaleforge/internal/catalog"
+	"github.com/scaleforge/scaleforge/internal/runtime"
 )
+
+// runtimeCatalog holds the curated language/runtime performance coefficients.
+// It is static curated data (like the inter-region latency constant), so a
+// package-level instance is sufficient; factors only apply to compute nodes and
+// Go == 1.0, so an unset runtime leaves results identical to before the feature.
+var runtimeCatalog = runtime.NewCatalog()
 
 // CalculateIncomingRPS derives requests per second from traffic profile.
 // Formula: (concurrentUsers * requestsPerUserMin / 60) * peakTrafficMultiplier
@@ -105,7 +112,15 @@ func nodeCapacityFor(node Node, defs map[string]catalog.NodeDefinition) float64 
 		cpuMultiplier = float64(node.Config.CPU) / 2.0
 	}
 
-	return def.PerInstanceCapacity * float64(replicas) * cpuMultiplier
+	capacity := def.PerInstanceCapacity * float64(replicas) * cpuMultiplier
+
+	// Compute components run user code, so the language/runtime changes how much
+	// throughput a core delivers. Managed services (DBs, caches, edge) are fixed.
+	if def.Category == catalog.CategoryCompute {
+		capacity *= runtimeCatalog.OrDefault(node.Config.Runtime).ThroughputFactor
+	}
+
+	return capacity
 }
 
 // interRegionLatencyMs is the round-trip penalty added for each edge that
@@ -141,7 +156,12 @@ func calculateLatency(graph Graph, defs map[string]catalog.NodeDefinition) float
 	var total float64
 	for _, node := range nodes {
 		if def, ok := defs[node.Type]; ok {
-			total += def.BaseLatencyMs
+			latency := def.BaseLatencyMs
+			// Runtime affects how fast user code on compute nodes responds.
+			if def.Category == catalog.CategoryCompute {
+				latency *= runtimeCatalog.OrDefault(node.Config.Runtime).LatencyFactor
+			}
+			total += latency
 		}
 	}
 	// Each cross-region hop on the path adds inter-region round-trip latency.

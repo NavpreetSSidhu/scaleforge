@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isWinner, metricRows, providerScenarios, winTally } from '@/lib/compare';
+import { isWinner, metricRows, providerScenarios, runtimeScenarios, winTally } from '@/lib/compare';
 import type {
   Comparison,
   Graph,
   PricingProvider,
+  Runtime,
   SimulationResult,
   TrafficProfile,
 } from '@/types/domain';
@@ -56,6 +57,38 @@ describe('providerScenarios', () => {
     expect(scenarios[0].label).toBe('AWS');
     expect(scenarios[0].graph).toBe(graph);
     expect(scenarios[1].traffic).toBe(traffic);
+  });
+});
+
+describe('runtimeScenarios', () => {
+  const mixedGraph: Graph = {
+    nodes: [
+      { id: 'api', type: 'api_service', label: 'API', position: { x: 0, y: 0 }, config: { cpu: 2, memory: 4, replicas: 2, autoscaling: true } },
+      { id: 'db', type: 'sql_primary', label: 'DB', position: { x: 0, y: 0 }, config: { cpu: 4, memory: 8, replicas: 1, autoscaling: false } },
+    ],
+    edges: [{ id: 'e', source: 'api', target: 'db' }],
+  };
+  const runtimes: Runtime[] = [
+    { id: 'go', label: 'Go', throughputFactor: 1, latencyFactor: 1, memoryFactor: 1 },
+    { id: 'rust', label: 'Rust', throughputFactor: 1.75, latencyFactor: 0.8, memoryFactor: 0.55 },
+  ];
+  const computeTypes = new Set(['api_service']);
+
+  it('builds one scenario per runtime, stamping only compute nodes', () => {
+    const scenarios = runtimeScenarios(mixedGraph, traffic, 'aws', runtimes, computeTypes);
+    expect(scenarios.map((s) => s.label)).toEqual(['Go', 'Rust']);
+    expect(scenarios.every((s) => s.provider === 'aws')).toBe(true);
+
+    const rust = scenarios[1];
+    const api = rust.graph.nodes.find((n) => n.id === 'api');
+    const db = rust.graph.nodes.find((n) => n.id === 'db');
+    expect(api?.config.runtime).toBe('rust'); // compute node stamped
+    expect(db?.config.runtime).toBeUndefined(); // managed node left untouched
+  });
+
+  it('does not mutate the source graph', () => {
+    runtimeScenarios(mixedGraph, traffic, 'aws', runtimes, computeTypes);
+    expect(mixedGraph.nodes[0].config.runtime).toBeUndefined();
   });
 });
 

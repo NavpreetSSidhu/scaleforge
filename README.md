@@ -4,6 +4,12 @@
 
 ScaleForge is a gamified infrastructure architecture simulator. Engineers can visually design distributed systems on a canvas, define traffic profiles, and run simulations to estimate latency, throughput, cost, bottlenecks, and architecture scores.
 
+<p align="center">
+  <img src="./docs/preview.gif" alt="ScaleForge demo — design an architecture, run a load simulation, ask the AI assistant to add a cache, and compare runtimes" width="100%">
+</p>
+
+> Build an architecture → run a load simulation → ask the **AI assistant** to improve it (it proposes changes you preview and apply) → **compare languages/runtimes** and cloud providers.
+
 ## Architecture
 
 ```text
@@ -111,6 +117,9 @@ Expected results (approximate):
 |--------|-----------------------|--------------------------------|
 | GET    | `/health`             | Health check + DB ping         |
 | GET    | `/catalog`            | Node type definitions          |
+| GET    | `/runtimes`           | Language/runtime perf coefficients |
+| GET    | `/assistant`          | Assistant availability (`{enabled}`) |
+| POST   | `/assistant`          | AI architecture assistant (chat) |
 | POST   | `/architectures`      | Create architecture            |
 | GET    | `/architectures`      | List architectures             |
 | GET    | `/architectures/:id`  | Get architecture               |
@@ -224,6 +233,45 @@ ScaleForge uses stateless **JWT (HS256)** auth with an optional, limited guest m
 - Architecture ownership is enforced per authenticated user.
 
 Set `JWT_SECRET` to a strong value in any non-local deployment — the default in `.env.example` is for development only.
+
+### Rate limiting
+
+Important endpoints are rate-limited per client IP (in-memory fixed window, `internal/middleware/ratelimit.go`):
+
+| Endpoints | Limit |
+|-----------|-------|
+| `POST /auth/signup`, `POST /auth/login` | 10 / min (blunts brute-force & enumeration) |
+| `POST /simulate`, `POST /compare` | 60 / min (compute-heavy) |
+| `POST /assistant` | 10 / min (protects the free LLM quota) |
+
+Over-limit requests get `429 Too Many Requests`. Read-only browsing (`/catalog`, `/pricing`, `/runtimes`) is unthrottled. For a multi-instance deployment this would move to a shared store (e.g. Redis).
+
+## AI Assistant
+
+ScaleForge ships an optional AI assistant that **explains** the current architecture
+(grounded in the live simulation numbers) and **proposes concrete changes** you preview
+and apply to the canvas.
+
+- Backed by [Groq](https://console.groq.com)'s free, OpenAI-compatible API (default model
+  `llama-3.3-70b-versatile`). Set `GROQ_API_KEY` to enable it; the provider is a swappable
+  seam (`internal/assist`), so any OpenAI-style endpoint works.
+- The model returns a constrained JSON envelope (`{ reply, actions }`). Every action is
+  **validated server-side against the catalog and the current graph** before reaching the
+  client, so it can never introduce unknown components or dangling references.
+- The UI is a slide-in drawer (sparkle button in the top bar, hidden when no key is set).
+  Proposed changes appear as chips you **Apply** (or **Apply all**), then auto-resimulate.
+- `POST /assistant` is guest-friendly but rate-limited per client to protect the free quota.
+
+## Runtime / language comparison
+
+Compute components can declare the language/runtime they're built in (Go, Rust, Node.js,
+Python, Java, C#/.NET). The simulation engine applies per-runtime throughput and latency
+factors to compute nodes only — managed services (databases, caches, edge) are unaffected.
+
+The coefficients are a **curated static table** (`internal/runtime`) derived from the public
+[TechEmpower Framework Benchmarks](https://www.techempower.com/benchmarks/), normalized to
+**Go = 1.0** — so an architecture with no runtime set behaves exactly as before. The Compare
+view's **"Across runtimes"** mode ranks runtimes for your architecture and cites its source.
 
 ## License
 

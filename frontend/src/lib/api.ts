@@ -1,11 +1,14 @@
 import type {
   Achievement,
   Architecture,
+  AssistantRequest,
+  AssistantResponse,
   Comparison,
   CompareRequest,
   Graph,
   NodeDefinition,
   PricingProvider,
+  RuntimeCatalog,
   SimulateRequest,
   SimulationResult,
   TrafficProfile,
@@ -72,6 +75,16 @@ export const api = {
 
   getPricing: () =>
     request<{ providers: PricingProvider[]; defaultProviderId: string }>('/pricing'),
+
+  getRuntimes: () => request<RuntimeCatalog>('/runtimes'),
+
+  getAssistantStatus: () => request<{ enabled: boolean }>('/assistant'),
+
+  assistant: (payload: AssistantRequest) =>
+    request<AssistantResponse>('/assistant', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 
   simulate: (payload: SimulateRequest) =>
     request<SimulationResult>('/simulate', {
