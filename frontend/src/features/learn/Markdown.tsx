@@ -1,4 +1,51 @@
+import { useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
+import rehypeHighlight from 'rehype-highlight';
+import { Check, Copy } from 'lucide-react';
+import 'highlight.js/styles/github-dark.css';
+
+/** A fenced code block: syntax-highlighted, horizontally scrollable, with a copy button. */
+function CodeBlock({ children }: { children?: ReactNode }) {
+  const ref = useRef<HTMLPreElement>(null);
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    const text = ref.current?.textContent ?? '';
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable — no-op */
+    }
+  };
+
+  return (
+    <div className="group relative my-3">
+      <button
+        type="button"
+        onClick={copy}
+        className="absolute right-2 top-2 z-10 flex items-center gap-1 rounded-md border border-white/[0.08] bg-surface/80 px-2 py-1 text-[11px] text-ink-muted opacity-0 backdrop-blur transition hover:text-ink group-hover:opacity-100"
+      >
+        {copied ? (
+          <>
+            <Check className="h-3 w-3 text-accent" /> Copied
+          </>
+        ) : (
+          <>
+            <Copy className="h-3 w-3" /> Copy
+          </>
+        )}
+      </button>
+      <pre
+        ref={ref}
+        className="overflow-x-auto rounded-lg border border-white/[0.06] text-[0.78rem] leading-relaxed [&>code.hljs]:block [&>code.hljs]:rounded-lg [&>code.hljs]:p-3.5"
+      >
+        {children}
+      </pre>
+    </div>
+  );
+}
 
 /** Dark-theme markdown styling shared by lesson bodies and tutor replies. */
 const components: Components = {
@@ -9,11 +56,18 @@ const components: Components = {
   ol: ({ children }) => <ol className="mb-3 list-decimal space-y-1 pl-5 last:mb-0">{children}</ol>,
   li: ({ children }) => <li className="leading-relaxed">{children}</li>,
   h3: ({ children }) => <h3 className="mb-2 text-sm font-semibold text-ink">{children}</h3>,
-  code: ({ children }) => (
-    <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[0.85em] text-accent">
-      {children}
-    </code>
-  ),
+  pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
+  code: ({ className, children }) => {
+    // rehype-highlight tags fenced blocks with `language-*`/`hljs`; inline code has neither.
+    if (className && /language-|hljs/.test(className)) {
+      return <code className={className}>{children}</code>;
+    }
+    return (
+      <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[0.85em] text-accent">
+        {children}
+      </code>
+    );
+  },
   a: ({ children, href }) => (
     <a href={href} target="_blank" rel="noreferrer" className="text-accent underline">
       {children}
@@ -24,7 +78,9 @@ const components: Components = {
 export function Markdown({ children, className }: { children: string; className?: string }) {
   return (
     <div className={`text-sm text-ink-muted ${className ?? ''}`}>
-      <ReactMarkdown components={components}>{children}</ReactMarkdown>
+      <ReactMarkdown components={components} rehypePlugins={[rehypeHighlight]}>
+        {children}
+      </ReactMarkdown>
     </div>
   );
 }

@@ -91,7 +91,29 @@ const typeIcons: Record<string, LucideIcon> = {
   waf: ShieldAlert,
   secrets_manager: Lock,
   monitoring: Gauge,
+  // Abstract class / data-structure types used by low-level-design (LLD) courses.
+  lld_class: Boxes,
+  lld_index: KeyRound,
+  lld_list: GitBranch,
+  lld_node: Binary,
+  lld_bucket: Gauge,
 };
+
+/**
+ * Category for an abstract LLD diagram node type (not part of the backend
+ * catalog). Lets class/data-structure nodes borrow an accent colour + label.
+ */
+const lldCategories: Record<string, string> = {
+  lld_class: 'compute',
+  lld_index: 'database',
+  lld_list: 'cache',
+  lld_node: 'cache',
+  lld_bucket: 'messaging',
+};
+
+export function lldCategoryFor(type: string): string | undefined {
+  return lldCategories[type];
+}
 
 const categoryIcons: Record<string, LucideIcon> = {
   edge: Cloud,

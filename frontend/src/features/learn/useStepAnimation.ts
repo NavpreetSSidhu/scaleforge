@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useReactFlow, type Edge, type Node } from 'reactflow';
-import { categoryStyle } from '@/lib/catalog';
+import { categoryStyle, lldCategoryFor } from '@/lib/catalog';
 import type { Course } from '@/types/domain';
 import type { LessonNodeData } from './LessonNode';
 
@@ -38,7 +38,7 @@ export function useStepAnimation(
           selectable: false,
           data: {
             ...n,
-            category: categoryByType.get(n.type) ?? 'compute',
+            category: categoryByType.get(n.type) ?? lldCategoryFor(n.type) ?? 'compute',
             focused: focusId === n.id,
             dimmed: !!focusId && focusId !== n.id,
             callout: focusId === n.id ? step?.callout : undefined,
@@ -53,7 +53,9 @@ export function useStepAnimation(
         .filter((e) => revealEdges.has(e.id))
         .map((e) => {
           const targetType = course.graph.nodes.find((n) => n.id === e.target)?.type ?? '';
-          const accent = categoryStyle(categoryByType.get(targetType) ?? 'compute').accent;
+          const accent = categoryStyle(
+            categoryByType.get(targetType) ?? lldCategoryFor(targetType) ?? 'compute',
+          ).accent;
           return {
             id: e.id,
             source: e.source,

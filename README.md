@@ -273,6 +273,32 @@ The coefficients are a **curated static table** (`internal/runtime`) derived fro
 **Go = 1.0** — so an architecture with no runtime set behaves exactly as before. The Compare
 view's **"Across runtimes"** mode ranks runtimes for your architecture and cites its source.
 
+## Learn
+
+The **Learn** tab is a library of pre-authored, animated lessons. Each course is static
+content (`frontend/src/data/courses/`): a diagram revealed step-by-step on a read-only React
+Flow stage (cumulative node/edge build-up + a spotlight/callout per step) alongside a
+markdown lesson panel. Progress is saved per signed-in user; guests can step through freely.
+
+Two flavours, grouped in the catalog:
+
+- **System Design** — courses teaching an infrastructure architecture (load balancing,
+  caching, rate limiting, replication, sharding, message queues, distributed logging). Each
+  one's design can be loaded onto the builder canvas with **Try it on canvas** and simulated.
+- **Low-Level Design (LLD)** — coding courses for classic interview questions: **LRU Cache**,
+  **LFU Cache**, **Rate Limiter** (token bucket), and **Parking Lot** (OOD). The stage shows
+  an animated class / data-structure diagram while the lesson teaches the implementation in
+  **Python** with syntax-highlighted, copyable code; the complete runnable reference solution
+  is one click away via **Copy full solution**.
+
+### AI Tutor
+
+When `GROQ_API_KEY` is set, each lesson exposes an optional AI **Tutor** (slide-in drawer,
+`internal/tutor`) with two personas — **Teacher** (elaborates on the current step) and
+**Q&A** (freeform questions) — both grounded and returned as a constrained `{ reply }`
+envelope. The tutor is rate-limited per client; lessons and animations work fully without a
+key (the AI entry points are simply hidden).
+
 ## License
 
 Released under the [MIT License](./LICENSE). See the `LICENSE` file for the full text.

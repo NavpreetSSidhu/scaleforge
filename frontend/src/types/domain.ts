@@ -261,9 +261,17 @@ export interface Course {
   summary: string;
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
   category: string;
+  /**
+   * Course flavour. 'system-design' (default) courses teach an infra graph and
+   * can be loaded onto the builder canvas. 'lld' (low-level design) courses
+   * teach a class/data-structure diagram + code, and expose a copyable solution.
+   */
+  kind?: 'system-design' | 'lld';
   /** The full architecture the course teaches; steps reveal subsets of it. */
   graph: Graph;
   steps: CourseStep[];
+  /** Full reference implementation for LLD courses (read & copy). */
+  solution?: { language: string; code: string };
 }
 
 /** One turn of tutor conversation sent back as context. */

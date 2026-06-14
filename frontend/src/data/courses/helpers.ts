@@ -18,3 +18,12 @@ export const cfg = (
   autoscaling: boolean,
   region = 'us-east-1',
 ): NodeConfig => ({ cpu, memory, replicas, autoscaling, region });
+
+/**
+ * Wrap a snippet in a Python markdown code fence for an LLD lesson body. Built
+ * with plain string concatenation so the embedded code stays fence-free.
+ */
+export const py = (code: string): string => '\n\n```python\n' + code.trim() + '\n```\n';
+
+/** A neutral config for abstract LLD diagram nodes (compute numbers are unused). */
+export const lld = (): NodeConfig => cfg(1, 1, 1, false);

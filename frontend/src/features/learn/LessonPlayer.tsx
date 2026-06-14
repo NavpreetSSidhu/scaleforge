@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Check,
   ChevronLeft,
+  ClipboardCopy,
   GraduationCap,
   MessageCircleQuestion,
   Play,
@@ -32,6 +33,7 @@ export function LessonPlayer({ course }: { course: Course }) {
 
   const step = course.steps[stepIndex];
   const isLast = stepIndex === course.steps.length - 1;
+  const isLld = course.kind === 'lld';
 
   // Server-backed progress for signed-in users; guests track locally this session.
   const { data: progressList } = useQuery({
@@ -83,6 +85,16 @@ export function LessonPlayer({ course }: { course: Course }) {
     pushSnack(`Loaded "${course.title}" onto the canvas — hit Run to simulate`, 'success');
   };
 
+  const copySolution = async () => {
+    if (!course.solution) return;
+    try {
+      await navigator.clipboard.writeText(course.solution.code);
+      pushSnack('Full solution copied to clipboard', 'success');
+    } catch {
+      pushSnack('Could not access the clipboard', 'error');
+    }
+  };
+
   return (
     <div className="flex min-h-0 flex-1">
       {/* Lesson panel */}
@@ -130,6 +142,18 @@ export function LessonPlayer({ course }: { course: Course }) {
           </h3>
           <Markdown>{step.body}</Markdown>
 
+          {isLld && isLast && course.solution && (
+            <div className="mt-4 border-t border-white/[0.06] pt-4">
+              <h4 className="mb-1 text-sm font-semibold text-ink">Full implementation</h4>
+              <p className="mb-1 text-xs text-ink-faint">
+                The complete reference solution — copy it and run it locally.
+              </p>
+              <Markdown>
+                {`\`\`\`${course.solution.language}\n${course.solution.code}\n\`\`\``}
+              </Markdown>
+            </div>
+          )}
+
           {tutorEnabled && (
             <div className="mt-4 flex flex-wrap gap-2">
               <button
@@ -151,13 +175,24 @@ export function LessonPlayer({ course }: { course: Course }) {
         </div>
 
         <footer className="shrink-0 space-y-2 border-t border-white/[0.06] p-3">
-          <button
-            type="button"
-            onClick={tryOnCanvas}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/[0.08] bg-surface-panel/60 px-3 py-2 text-sm text-ink-muted transition hover:text-ink"
-          >
-            <Play className="h-4 w-4" /> Try it on canvas
-          </button>
+          {isLld ? (
+            <button
+              type="button"
+              onClick={copySolution}
+              disabled={!course.solution}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/[0.08] bg-surface-panel/60 px-3 py-2 text-sm text-ink-muted transition hover:text-ink disabled:opacity-30"
+            >
+              <ClipboardCopy className="h-4 w-4" /> Copy full solution
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={tryOnCanvas}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/[0.08] bg-surface-panel/60 px-3 py-2 text-sm text-ink-muted transition hover:text-ink"
+            >
+              <Play className="h-4 w-4" /> Try it on canvas
+            </button>
+          )}
           <div className="flex items-center gap-2">
             <button
               type="button"

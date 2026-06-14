@@ -6,9 +6,18 @@ import { databaseReplication } from './databaseReplication';
 import { databaseSharding } from './databaseSharding';
 import { messageQueues } from './messageQueues';
 import { distributedLogging } from './distributedLogging';
+import { lruCache } from './lruCache';
+import { lfuCache } from './lfuCache';
+import { rateLimiterLld } from './rateLimiterLld';
+import { parkingLot } from './parkingLot';
 
-/** Authored system-design courses, in catalog display order (roughly easy → hard). */
+/**
+ * Authored courses, in catalog display order. System-design courses teach an
+ * infra graph; low-level-design (kind: 'lld') courses teach a class /
+ * data-structure diagram + copyable code. LearnView groups them by kind.
+ */
 export const courses: Course[] = [
+  // System design
   loadBalancing,
   caching,
   rateLimiting,
@@ -16,6 +25,11 @@ export const courses: Course[] = [
   messageQueues,
   databaseSharding,
   distributedLogging,
+  // Low-level design
+  lruCache,
+  lfuCache,
+  rateLimiterLld,
+  parkingLot,
 ];
 
 export const courseBySlug = (slug: string): Course | undefined =>

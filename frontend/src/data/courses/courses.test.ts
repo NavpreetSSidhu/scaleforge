@@ -48,4 +48,17 @@ describe('authored courses', () => {
       expect(new Set(last.revealEdgeIds)).toEqual(edgeIds);
     });
   });
+
+  describe.each(courses.filter((c) => c.kind === 'lld'))('lld course $slug', (course) => {
+    it('ships a non-empty code solution', () => {
+      expect(course.solution).toBeDefined();
+      expect(course.solution?.language).toBeTruthy();
+      expect((course.solution?.code ?? '').trim().length).toBeGreaterThan(0);
+    });
+  });
+
+  it('has at least one lld and one system-design course', () => {
+    expect(courses.some((c) => c.kind === 'lld')).toBe(true);
+    expect(courses.some((c) => c.kind !== 'lld')).toBe(true);
+  });
 });
