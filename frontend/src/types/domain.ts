@@ -231,3 +231,71 @@ export interface AssistantRequest {
   result?: SimulationResult | null;
   history?: AssistantMessage[];
 }
+
+// --- Learn module (courses + AI Teacher / Q&A) ---
+
+/**
+ * One step of an authored course. Carries the explanation text plus the
+ * animation choreography: which nodes/edges are visible by this step (build-up
+ * reveal), which node to spotlight (pan/zoom + glow), and an optional callout.
+ */
+export interface CourseStep {
+  id: string;
+  title: string;
+  /** Markdown explanation shown in the lesson panel. */
+  body: string;
+  /** Cumulative set of node ids visible once this step is reached. */
+  revealNodeIds: string[];
+  /** Cumulative set of edge ids visible once this step is reached. */
+  revealEdgeIds: string[];
+  /** Node id to pan/zoom to and highlight for this step. */
+  focusNodeId?: string;
+  /** Short callout bubble shown beside the focused node. */
+  callout?: string;
+}
+
+/** An authored, pre-built course: one design graph revealed step by step. */
+export interface Course {
+  slug: string;
+  title: string;
+  summary: string;
+  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+  category: string;
+  /** The full architecture the course teaches; steps reveal subsets of it. */
+  graph: Graph;
+  steps: CourseStep[];
+}
+
+/** One turn of tutor conversation sent back as context. */
+export interface TutorMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+/** Request to the Teacher persona — elaborates on the current step. */
+export interface TutorExplainRequest {
+  courseTitle: string;
+  stepTitle: string;
+  stepBody: string;
+  focusComponent?: string;
+  question?: string;
+  history?: TutorMessage[];
+}
+
+/** Request to the separate Q&A agent — freeform questions. */
+export interface TutorAskRequest {
+  courseTitle?: string;
+  question: string;
+  history?: TutorMessage[];
+}
+
+export interface TutorReply {
+  reply: string;
+}
+
+export interface CourseProgress {
+  courseSlug: string;
+  completedSteps: number[];
+  completed: boolean;
+  updatedAt?: string;
+}

@@ -52,7 +52,7 @@ type ActionConfig struct {
 // Result is the latest simulation output (optional) so explanations cite real
 // numbers; History is prior turns for multi-turn context.
 type ChatRequest struct {
-	Message  string                    `json:"message" binding:"required"`
+	Message  string                    `json:"message" binding:"required,max=2000"`
 	Graph    simulation.Graph          `json:"graph"`
 	Traffic  simulation.TrafficProfile `json:"traffic"`
 	Provider string                    `json:"provider,omitempty"`

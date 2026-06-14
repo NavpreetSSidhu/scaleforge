@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   Hammer,
   GitCompareArrows,
+  GraduationCap,
   Smartphone,
   Save,
   Share2,
@@ -38,6 +39,7 @@ const tabs: { id: AppView; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
   { id: 'builder', label: 'Builder', icon: <Hammer className="h-4 w-4" /> },
   { id: 'compare', label: 'Compare', icon: <GitCompareArrows className="h-4 w-4" /> },
+  { id: 'learn', label: 'Learn', icon: <GraduationCap className="h-4 w-4" /> },
   { id: 'mobile', label: 'Mobile', icon: <Smartphone className="h-4 w-4" /> },
 ];
 
@@ -119,14 +121,14 @@ export function TopBar({ onRun, isRunning, onSave, isSaving }: TopBarProps) {
       </Tooltip>
 
       {/* Logo */}
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         <LogoMark />
         <span className="text-[15px] font-bold tracking-tight">ScaleForge</span>
-        <span className="chip bg-accent/15 text-accent">Beta</span>
+        <span className="chip hidden bg-accent/15 text-accent sm:inline-block">Beta</span>
       </div>
 
       {/* Nav tabs */}
-      <nav className="ml-2 hidden items-center gap-1 md:flex">
+      <nav className="ml-2 hidden shrink-0 items-center gap-1 md:flex">
         {tabs.map((t) => (
           <Tab
             key={t.id}
@@ -138,18 +140,18 @@ export function TopBar({ onRun, isRunning, onSave, isSaving }: TopBarProps) {
         ))}
       </nav>
 
-      <div className="ml-auto flex items-center gap-2">
-        <span className="hidden text-xs lg:block">
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        <span className="hidden whitespace-nowrap text-xs 2xl:block">
           <span className="text-ink-faint">{dirty ? 'unsaved changes' : 'all changes saved'}</span>
         </span>
 
         {/* Cloud pricing provider */}
-        <div className="hidden sm:block">
+        <div className="hidden xl:block">
           <ProviderSelector />
         </div>
 
         {/* Environment selector */}
-        <div className="relative hidden sm:block">
+        <div className="relative hidden 2xl:block">
           <Tooltip label="Traffic environment (peak multiplier)">
             <button
               type="button"
@@ -301,14 +303,16 @@ function Tab({
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition ${
+      title={label}
+      aria-label={label}
+      className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm transition xl:px-3 ${
         active
           ? 'bg-surface-panel text-ink shadow-sm ring-1 ring-white/[0.06]'
           : 'text-ink-faint hover:text-ink-muted'
       }`}
     >
       {icon}
-      {label}
+      <span className="hidden xl:inline">{label}</span>
     </button>
   );
 }

@@ -18,6 +18,7 @@ import (
 	runtimepkg "github.com/scaleforge/scaleforge/internal/runtime"
 	"github.com/scaleforge/scaleforge/internal/scoring"
 	"github.com/scaleforge/scaleforge/internal/simulation"
+	"github.com/scaleforge/scaleforge/internal/tutor"
 )
 
 type Dependencies struct {
@@ -55,6 +56,14 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 	}
 	assistService := assist.NewService(assistProvider, catalogService)
 
+	// The tutor reuses the same LLM provider; lesson content is authored client-
+	// side, so this only powers the Teacher/Q&A personas + progress persistence.
+	var tutorProvider tutor.Provider
+	if assistProvider != nil {
+		tutorProvider = assistProvider
+	}
+	tutorService := tutor.NewService(tutorProvider, catalogService, deps.Store)
+
 	archHandler := NewArchitectureHandler(deps.Store, catalogService, deps.Store)
 	simHandler := NewSimulationHandler(simService, catalogService, achievementsService)
 	authHandler := NewAuthHandler(authService)
@@ -62,6 +71,7 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 	pricingHandler := NewPricingHandler(pricingCatalog)
 	runtimeHandler := NewRuntimeHandler(runtimepkg.NewCatalog())
 	assistHandler := NewAssistHandler(assistService)
+	tutorHandler := NewTutorHandler(tutorService)
 
 	// Per-IP rate limiters guarding the endpoints worth protecting: auth (brute
 	// force / account enumeration) and the compute-heavy simulation endpoints.
@@ -88,6 +98,12 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 		guest.POST("/compare", simLimiter.Middleware(), simHandler.Compare)
 		guest.GET("/assistant", assistHandler.Status)
 		guest.POST("/assistant", assistHandler.Chat)
+
+		// Learn module: authored lessons render client-side; these power the two
+		// AI personas (gated by API key, rate-limited inside the handler).
+		guest.GET("/tutor", tutorHandler.Status)
+		guest.POST("/tutor/explain", tutorHandler.Explain)
+		guest.POST("/tutor/ask", tutorHandler.Ask)
 	}
 
 	// Account-only: saving/loading architectures and fetching the profile.
@@ -105,6 +121,9 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 		authed.GET("/simulation/:id", simHandler.Get)
 
 		authed.GET("/achievements", achievementsHandler.List)
+
+		authed.GET("/tutor/progress", tutorHandler.ListProgress)
+		authed.PUT("/tutor/progress/:slug", tutorHandler.UpdateProgress)
 	}
 
 	return r
@@ -117,4 +136,5 @@ var (
 	_ repository.HealthChecker          = (*postgres.Store)(nil)
 	_ auth.UserRepository               = (*postgres.Store)(nil)
 	_ achievements.Repository           = (*postgres.Store)(nil)
+	_ tutor.Repository                  = (*postgres.Store)(nil)
 )

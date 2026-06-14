@@ -11,7 +11,7 @@ import type {
 import { demoGraph, demoTraffic } from '@/data/demoScenario';
 
 export type ScoreView = 'cards' | 'gauges' | 'radar';
-export type AppView = 'dashboard' | 'builder' | 'mobile' | 'compare';
+export type AppView = 'dashboard' | 'builder' | 'mobile' | 'compare' | 'learn';
 
 export const DEFAULT_REGION = 'us-east-1';
 export const DEFAULT_PROVIDER = 'aws';
@@ -270,6 +270,7 @@ export const useArchitectureStore = create<ArchitectureState>((set, get) => ({
       regions: deriveRegions(nodes),
       selectedNodeId: null,
       simulationResult: null,
+      view: 'builder',
       dirty: false,
     });
   },

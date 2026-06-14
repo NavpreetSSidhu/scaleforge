@@ -5,6 +5,7 @@ import type {
   AssistantResponse,
   Comparison,
   CompareRequest,
+  CourseProgress,
   Graph,
   NodeDefinition,
   PricingProvider,
@@ -12,6 +13,9 @@ import type {
   SimulateRequest,
   SimulationResult,
   TrafficProfile,
+  TutorAskRequest,
+  TutorExplainRequest,
+  TutorReply,
 } from '@/types/domain';
 import type { AuthUser } from '@/store/authStore';
 
@@ -124,4 +128,23 @@ export const api = {
 
   listAchievements: () =>
     request<{ achievements: Achievement[] }>('/achievements').then((r) => r.achievements),
+
+  // --- Learn module ---
+
+  getTutorStatus: () => request<{ enabled: boolean }>('/tutor'),
+
+  tutorExplain: (payload: TutorExplainRequest) =>
+    request<TutorReply>('/tutor/explain', { method: 'POST', body: JSON.stringify(payload) }),
+
+  tutorAsk: (payload: TutorAskRequest) =>
+    request<TutorReply>('/tutor/ask', { method: 'POST', body: JSON.stringify(payload) }),
+
+  getProgress: () =>
+    request<{ progress: CourseProgress[] }>('/tutor/progress').then((r) => r.progress),
+
+  updateProgress: (slug: string, payload: { completedSteps: number[]; completed: boolean }) =>
+    request<CourseProgress>(`/tutor/progress/${slug}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
 };

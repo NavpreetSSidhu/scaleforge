@@ -38,6 +38,9 @@ const SUGGESTIONS = [
   'How can I cut cost without losing reliability?',
 ];
 
+/** Message length cap — mirrored by the backend (`binding:"max=2000"`). */
+const MAX_CHARS = 2000;
+
 export function AssistantDrawer({ onRun }: { onRun: () => void }) {
   const { open, setOpen, messages, pushUser, pushAssistant, markApplied, reset } =
     useAssistantStore();
@@ -45,6 +48,16 @@ export function AssistantDrawer({ onRun }: { onRun: () => void }) {
   const pushSnack = useSnackbar((s) => s.push);
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-grow the composer up to a max height so the first line never scrolls
+  // out of view as the message wraps onto more lines.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+  }, [input]);
 
   const { data: catalog = [] } = useQuery({
     queryKey: ['catalog'],
@@ -164,6 +177,7 @@ export function AssistantDrawer({ onRun }: { onRun: () => void }) {
             <div className="shrink-0 border-t border-white/[0.06] p-3">
               <div className="flex items-end gap-2 rounded-xl border border-white/[0.08] bg-surface-panel/60 px-3 py-2 focus-within:border-accent/40">
                 <textarea
+                  ref={inputRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -173,9 +187,19 @@ export function AssistantDrawer({ onRun }: { onRun: () => void }) {
                     }
                   }}
                   rows={1}
+                  maxLength={MAX_CHARS}
                   placeholder="Ask about or change your architecture…"
-                  className="max-h-32 flex-1 resize-none bg-transparent text-sm text-ink outline-none placeholder:text-ink-ghost"
+                  className="max-h-32 flex-1 resize-none overflow-y-auto bg-transparent text-sm text-ink outline-none placeholder:text-ink-ghost"
                 />
+                {input.length >= MAX_CHARS - 200 && (
+                  <span
+                    className={`shrink-0 self-end pb-0.5 font-mono text-[10px] ${
+                      input.length >= MAX_CHARS ? 'text-danger' : 'text-ink-ghost'
+                    }`}
+                  >
+                    {input.length}/{MAX_CHARS}
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => send(input)}
@@ -187,7 +211,11 @@ export function AssistantDrawer({ onRun }: { onRun: () => void }) {
                 </button>
               </div>
               <p className="mt-1.5 px-1 text-[10px] text-ink-ghost">
-                Suggestions are estimates — review changes before applying.
+                {input.length >= MAX_CHARS ? (
+                  <span className="text-danger">Character limit reached ({MAX_CHARS}).</span>
+                ) : (
+                  'Suggestions are estimates — review changes before applying.'
+                )}
               </p>
             </div>
           </motion.aside>

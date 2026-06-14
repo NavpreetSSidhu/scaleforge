@@ -10,8 +10,10 @@ import { BuilderView } from '@/features/builder/BuilderView';
 import { DashboardView } from '@/features/dashboard/DashboardView';
 import { CompareView } from '@/features/compare/CompareView';
 import { MobileView } from '@/features/mobile/MobileView';
+import { LearnView } from '@/features/learn/LearnView';
 import { ReportDrawer } from '@/features/report/ReportDrawer';
 import { AssistantDrawer } from '@/features/assistant/AssistantDrawer';
+import { TutorDrawer } from '@/features/learn/TutorDrawer';
 import { AuthModal } from '@/features/auth/AuthModal';
 import { AchievementToaster } from '@/features/achievements/AchievementToast';
 import { Snackbar } from '@/components/Snackbar';
@@ -166,9 +168,11 @@ export default function App() {
       {view === 'dashboard' && <DashboardView />}
       {view === 'compare' && <CompareView />}
       {view === 'mobile' && <MobileView onRun={runSimulation} isRunning={simulate.isPending} />}
+      {view === 'learn' && <LearnView />}
 
       <ReportDrawer />
       <AssistantDrawer onRun={runSimulation} />
+      <TutorDrawer />
       <AuthModal />
       <AchievementToaster />
       <Snackbar />
