@@ -6,6 +6,7 @@ import { Canvas } from '@/features/builder/Canvas';
 import { CanvasHeader } from '@/features/builder/CanvasHeader';
 import { MetricsStrip } from '@/features/metrics/MetricsStrip';
 import { TrafficScaler } from '@/features/metrics/TrafficScaler';
+import { ChaosControls } from '@/features/chaos/ChaosControls';
 import { Inspector } from '@/features/inspector/Inspector';
 
 export function BuilderView() {
@@ -57,6 +58,7 @@ export function BuilderView() {
           </div>
           <TrafficScaler />
           <MetricsStrip />
+          <ChaosControls />
 
           {/* Focus-mode exit affordance */}
           {focusMode && (

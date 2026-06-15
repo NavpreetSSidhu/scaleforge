@@ -42,7 +42,7 @@ const SUGGESTIONS = [
 const MAX_CHARS = 2000;
 
 export function AssistantDrawer({ onRun }: { onRun: () => void }) {
-  const { open, setOpen, messages, pushUser, pushAssistant, markApplied, reset } =
+  const { open, setOpen, messages, pending, clearPending, pushUser, pushAssistant, markApplied, reset } =
     useAssistantStore();
   const { nodes, edges, traffic, provider, simulationResult } = useArchitectureStore();
   const pushSnack = useSnackbar((s) => s.push);
@@ -96,6 +96,16 @@ export function AssistantDrawer({ onRun }: { onRun: () => void }) {
     setInput('');
     ask.mutate(message);
   };
+
+  // A prompt queued from elsewhere (e.g. chaos mode's "Make it resilient") opens
+  // the drawer and sends itself once.
+  useEffect(() => {
+    if (open && pending) {
+      send(pending);
+      clearPending();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, pending]);
 
   const apply = (entry: ChatEntry, actions: AssistantAction[]) => {
     const { applied, skipped } = applyAssistantActions(actions, catalog);

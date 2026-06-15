@@ -106,6 +106,7 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 		guest.GET("/runtimes", runtimeHandler.List)
 		guest.POST("/simulate", simLimiter.Middleware(), simHandler.Simulate)
 		guest.POST("/compare", simLimiter.Middleware(), simHandler.Compare)
+		guest.POST("/chaos", simLimiter.Middleware(), simHandler.Chaos)
 		guest.GET("/assistant", assistHandler.Status)
 		guest.POST("/assistant", assistHandler.Chat)
 

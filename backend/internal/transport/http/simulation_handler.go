@@ -76,6 +76,19 @@ func (h *SimulationHandler) Compare(c *gin.Context) {
 	c.JSON(http.StatusOK, h.service.Compare(req))
 }
 
+// Chaos injects a failure scenario (killed nodes, region outage, traffic spike)
+// and returns the degraded result, an availability verdict, and the
+// architecture's resilience score + single points of failure. Like Simulate it
+// is guest-friendly and never persists.
+func (h *SimulationHandler) Chaos(c *gin.Context) {
+	var req simulation.ChaosRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, h.service.Chaos(req))
+}
+
 func (h *SimulationHandler) Get(c *gin.Context) {
 	result, err := h.service.Get(c.Request.Context(), middleware.GetUserID(c), c.Param("id"))
 	if err != nil {

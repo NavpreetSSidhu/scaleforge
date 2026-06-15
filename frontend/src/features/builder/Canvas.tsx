@@ -17,6 +17,7 @@ import { MousePointerClick } from 'lucide-react';
 import { api } from '@/lib/api';
 import { categoryStyle } from '@/lib/catalog';
 import { useArchitectureStore } from '@/store/architectureStore';
+import { useChaosStore } from '@/store/chaosStore';
 import { regionAccent, regionOf } from '@/lib/regions';
 import type { GraphNode } from '@/types/domain';
 import InfrastructureNode, { type InfrastructureNodeData } from './InfrastructureNode';
@@ -80,6 +81,8 @@ export function Canvas() {
 
   const { screenToFlowPosition } = useReactFlow();
 
+  const { mode: chaosMode, result: chaosResult, toggleKill } = useChaosStore();
+
   const { data: catalog } = useQuery({
     queryKey: ['catalog'],
     queryFn: async () => (await api.getCatalog()).nodes,
@@ -91,11 +94,45 @@ export function Canvas() {
     return map;
   }, [catalog]);
 
-  const healthByNode = useMemo(() => {
-    const map = new Map<string, InfrastructureNodeData['healthStatus']>();
-    simulationResult?.nodeHealth.forEach((h) => map.set(h.nodeId, h.status));
+  // Per-node view state (health ring, load glow, dead flag). In Chaos mode this
+  // comes from the degraded chaos result; otherwise from the normal simulation.
+  // Computed once here and read by both the node sync and the edge memo.
+  const nodeView = useMemo(() => {
+    type View = { status: InfrastructureNodeData['healthStatus']; utilization?: number; dead?: boolean };
+    const map = new Map<string, View>();
+
+    if (chaosMode && chaosResult) {
+      const incoming = chaosResult.degraded.incomingRps;
+      const capacity = new Map(chaosResult.degraded.nodeHealth.map((h) => [h.nodeId, h.capacity]));
+      for (const impact of chaosResult.nodeImpacts) {
+        const cap = capacity.get(impact.nodeId);
+        map.set(impact.nodeId, {
+          dead: impact.status === 'dead',
+          status:
+            impact.status === 'overloaded'
+              ? 'bottleneck'
+              : impact.status === 'degraded'
+                ? 'warning'
+                : impact.status === 'healthy'
+                  ? 'healthy'
+                  : undefined,
+          utilization: cap && cap > 0 ? incoming / cap : undefined,
+        });
+      }
+      return map;
+    }
+
+    if (simulationResult) {
+      const incoming = simulationResult.incomingRps;
+      simulationResult.nodeHealth.forEach((h) =>
+        map.set(h.nodeId, {
+          status: h.status,
+          utilization: h.capacity > 0 ? incoming / h.capacity : undefined,
+        }),
+      );
+    }
     return map;
-  }, [simulationResult]);
+  }, [chaosMode, chaosResult, simulationResult]);
 
   // React Flow owns node view-state (incl. measured dimensions); the store is the
   // source of truth for structure/config. We sync store -> view here.
@@ -107,14 +144,16 @@ export function Canvas() {
   const syncSig = useMemo(
     () =>
       storeNodes
-        .map(
-          (n) =>
-            `${n.id}@${n.position.x},${n.position.y}:${n.label}:${n.config.cpu}/${n.config.replicas}:${
-              healthByNode.get(n.id) ?? ''
-            }:${categoryByType.get(n.type) ?? ''}:${regionOf(n.config.region)}`,
-        )
+        .map((n) => {
+          const v = nodeView.get(n.id);
+          return `${n.id}@${n.position.x},${n.position.y}:${n.label}:${n.config.cpu}/${n.config.replicas}:${
+            v?.status ?? ''
+          }:${v?.utilization?.toFixed(2) ?? ''}:${v?.dead ? 'x' : ''}:${
+            categoryByType.get(n.type) ?? ''
+          }:${regionOf(n.config.region)}`;
+        })
         .join('|'),
-    [storeNodes, healthByNode, categoryByType],
+    [storeNodes, nodeView, categoryByType],
   );
 
   useEffect(() => {
@@ -133,7 +172,9 @@ export function Canvas() {
           data: {
             ...sn,
             category: categoryByType.get(sn.type) ?? 'compute',
-            healthStatus: healthByNode.get(sn.id),
+            healthStatus: nodeView.get(sn.id)?.status,
+            utilization: nodeView.get(sn.id)?.utilization,
+            dead: nodeView.get(sn.id)?.dead,
           },
         };
       });
@@ -143,7 +184,7 @@ export function Canvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syncSig]);
 
-  const active = !!simulationResult;
+  const active = chaosMode ? !!chaosResult : !!simulationResult;
   const flowEdges: Edge<TrafficEdgeData>[] = useMemo(
     () =>
       storeEdges.map((edge) => {
@@ -151,16 +192,18 @@ export function Canvas() {
           storeNodes.find((n) => n.id === edge.target)?.type ?? '',
         );
         const accent = targetCat ? categoryStyle(targetCat).accent : '#2fd39e';
-        const overloaded = healthByNode.get(edge.target) === 'bottleneck';
+        const targetView = nodeView.get(edge.target);
+        const overloaded = targetView?.status === 'bottleneck';
+        const dead = nodeView.get(edge.source)?.dead === true || targetView?.dead === true;
         return {
           id: edge.id,
           source: edge.source,
           target: edge.target,
           type: 'traffic',
-          data: { accent, active, overloaded },
+          data: { accent, active, overloaded, load: targetView?.utilization, dead },
         };
       }),
-    [storeEdges, storeNodes, categoryByType, healthByNode, active],
+    [storeEdges, storeNodes, categoryByType, nodeView, active],
   );
 
   const onEdgesChange = useCallback(
@@ -196,6 +239,14 @@ export function Canvas() {
     [selectNode],
   );
 
+  // In Chaos mode a node click toggles a kill instead of just selecting it.
+  const onNodeClick = useCallback(
+    (_: unknown, node: Node) => {
+      if (chaosMode && node.type === 'infrastructure') toggleKill(node.id);
+    },
+    [chaosMode, toggleKill],
+  );
+
   const onDragOver = useCallback((e: DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
@@ -226,6 +277,7 @@ export function Canvas() {
         onConnect={onConnect}
         onNodeDragStop={onNodeDragStop}
         onNodesDelete={onNodesDelete}
+        onNodeClick={onNodeClick}
         onSelectionChange={onSelectionChange}
         onEdgeClick={(_, edge) => removeEdge(edge.id)}
         fitView

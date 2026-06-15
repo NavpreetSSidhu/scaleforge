@@ -1,13 +1,17 @@
 import { memo } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Handle, Position, type NodeProps } from 'reactflow';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, PowerOff } from 'lucide-react';
 import { categoryStyle, iconFor } from '@/lib/catalog';
 import type { GraphNode, NodeHealth } from '@/types/domain';
 
 export type InfrastructureNodeData = GraphNode & {
   category: string;
   healthStatus?: NodeHealth['status'];
+  /** 0..1+ load ratio (incoming / capacity); drives a graduated glow. */
+  utilization?: number;
+  /** Killed in Chaos mode (or inside a downed region) — rendered offline. */
+  dead?: boolean;
 };
 
 // Ring colour per status. Static glow lives here; the bottleneck's pulsing glow
@@ -26,23 +30,45 @@ const bottleneckPulse = {
   ],
 };
 
+// A graduated glow keyed to utilization, so a node visibly "warms up" as it
+// fills toward capacity even before it becomes the single bottleneck.
+function loadGlow(util: number | undefined): string {
+  if (util == null) return '';
+  if (util >= 1) return 'shadow-[0_0_20px_-2px_rgba(255,96,88,0.5)]';
+  if (util >= 0.75) return 'shadow-[0_0_18px_-2px_rgba(245,177,75,0.45)]';
+  if (util >= 0.4) return 'shadow-[0_0_16px_-3px_rgba(143,209,79,0.4)]';
+  return '';
+}
+
 function InfrastructureNodeComponent({ data, selected }: NodeProps<InfrastructureNodeData>) {
+  const reduceMotion = useReducedMotion();
   const style = categoryStyle(data.category);
   const Icon = iconFor(data.type, data.category);
-  const ring = data.healthStatus ? statusRing[data.healthStatus] : 'ring-white/[0.07]';
-  const isBottleneck = data.healthStatus === 'bottleneck';
+  const dead = data.dead === true;
+  const ring = dead
+    ? 'ring-white/[0.04]'
+    : data.healthStatus
+      ? statusRing[data.healthStatus]
+      : 'ring-white/[0.07]';
+  const isBottleneck = !dead && data.healthStatus === 'bottleneck';
 
   return (
     <motion.div
-      animate={isBottleneck ? bottleneckPulse : { boxShadow: '0 0 0px 0px rgba(0,0,0,0)' }}
+      animate={
+        isBottleneck && !reduceMotion
+          ? bottleneckPulse
+          : { boxShadow: '0 0 0px 0px rgba(0,0,0,0)' }
+      }
       transition={
-        isBottleneck
+        isBottleneck && !reduceMotion
           ? { duration: 1.6, repeat: Infinity, ease: 'easeInOut' }
           : { duration: 0.3 }
       }
-      className={`relative min-w-[168px] rounded-xl border border-white/[0.06] bg-surface-panel/95 px-3 py-2.5 ring-1 backdrop-blur transition-colors ${ring} ${
-        selected ? '!ring-2 !ring-accent' : ''
-      }`}
+      className={`relative min-w-[168px] rounded-xl border bg-surface-panel/95 px-3 py-2.5 ring-1 backdrop-blur transition-colors ${
+        dead
+          ? 'border-danger/40 opacity-50 grayscale'
+          : `border-white/[0.06] ${loadGlow(data.utilization)}`
+      } ${ring} ${selected ? '!ring-2 !ring-accent' : ''}`}
     >
       <Handle type="target" position={Position.Top} />
 
@@ -59,8 +85,12 @@ function InfrastructureNodeComponent({ data, selected }: NodeProps<Infrastructur
             {data.config.replicas}× · {data.config.cpu}vCPU
           </div>
         </div>
-        {data.healthStatus === 'bottleneck' && (
-          <AlertTriangle className="ml-auto h-4 w-4 shrink-0 text-danger" />
+        {dead ? (
+          <PowerOff className="ml-auto h-4 w-4 shrink-0 text-danger" />
+        ) : (
+          data.healthStatus === 'bottleneck' && (
+            <AlertTriangle className="ml-auto h-4 w-4 shrink-0 text-danger" />
+          )
         )}
       </div>
 

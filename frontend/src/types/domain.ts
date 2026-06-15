@@ -123,6 +123,48 @@ export interface SimulationResult {
   newAchievements?: Achievement[];
 }
 
+/** A node's state under an injected chaos failure. */
+export type NodeImpactStatus = 'dead' | 'overloaded' | 'degraded' | 'healthy';
+
+export interface NodeImpact {
+  nodeId: string;
+  status: NodeImpactStatus;
+}
+
+/** A node whose removal alone causes a full outage. */
+export interface Spof {
+  nodeId: string;
+  label: string;
+  impact: string;
+}
+
+export interface ChaosScenario {
+  killedNodeIds: string[];
+  outageRegion?: string;
+  spikeMultiplier?: number;
+}
+
+export interface ChaosRequest {
+  graph: Graph;
+  traffic: TrafficProfile;
+  provider?: string;
+  scenario: ChaosScenario;
+}
+
+export interface ChaosResult {
+  baseline: SimulationResult;
+  degraded: SimulationResult;
+  available: boolean;
+  /** 0..1 — served / incoming RPS. */
+  availability: number;
+  servedRps: number;
+  failedRps: number;
+  /** 0..100, scenario-independent resilience of the architecture as designed. */
+  resilienceScore: number;
+  spofs: Spof[];
+  nodeImpacts: NodeImpact[];
+}
+
 export interface SimulateRequest {
   architectureId?: string;
   name?: string;

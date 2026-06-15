@@ -3,6 +3,8 @@ import type {
   Architecture,
   AssistantRequest,
   AssistantResponse,
+  ChaosRequest,
+  ChaosResult,
   Comparison,
   CompareRequest,
   Course,
@@ -101,6 +103,12 @@ export const api = {
 
   compare: (payload: CompareRequest) =>
     request<Comparison>('/compare', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  chaos: (payload: ChaosRequest) =>
+    request<ChaosResult>('/chaos', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
