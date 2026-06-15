@@ -5,7 +5,10 @@ import type {
   AssistantResponse,
   Comparison,
   CompareRequest,
+  Course,
+  CourseDraft,
   CourseProgress,
+  GenerateCourseRequest,
   Graph,
   NodeDefinition,
   PricingProvider,
@@ -147,4 +150,21 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(payload),
     }),
+
+  // --- User-created courses ---
+
+  listCourses: () => request<{ courses: Course[] }>('/courses').then((r) => r.courses),
+
+  getCourse: (id: string) => request<Course>(`/courses/${id}`),
+
+  createCourse: (payload: CourseDraft) =>
+    request<Course>('/courses', { method: 'POST', body: JSON.stringify(payload) }),
+
+  updateCourse: (id: string, payload: CourseDraft) =>
+    request<Course>(`/courses/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+
+  deleteCourse: (id: string) => request<void>(`/courses/${id}`, { method: 'DELETE' }),
+
+  generateCourse: (payload: GenerateCourseRequest) =>
+    request<Course>('/courses/generate', { method: 'POST', body: JSON.stringify(payload) }),
 };
