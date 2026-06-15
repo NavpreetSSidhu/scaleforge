@@ -137,7 +137,7 @@ func (s *Service) resilience(graph Graph, traffic TrafficProfile, provider strin
 		}
 	}
 
-	var spofs []Spof
+	spofs := make([]Spof, 0) // JSON [] not null, so the client contract holds
 	for _, n := range graph.Nodes {
 		def, ok := defs[n.Type]
 		if !ok || !requiredCategories[def.Category] {

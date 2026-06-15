@@ -73,7 +73,7 @@ export function ChaosControls() {
   const score = result?.resilienceScore ?? null;
   const availabilityPct = result ? Math.round(result.availability * 100) : null;
   const fullOutage = result != null && !result.available;
-  const spofLabels = result?.spofs.map((s) => s.label) ?? [];
+  const spofLabels = result?.spofs?.map((s) => s.label) ?? [];
   const hasFailure = killedNodeIds.length > 0 || outageRegion != null || spikeMultiplier > 1;
 
   return (
