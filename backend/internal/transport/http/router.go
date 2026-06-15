@@ -11,6 +11,7 @@ import (
 	"github.com/scaleforge/scaleforge/internal/catalog"
 	"github.com/scaleforge/scaleforge/internal/config"
 	"github.com/scaleforge/scaleforge/internal/cost"
+	"github.com/scaleforge/scaleforge/internal/course"
 	"github.com/scaleforge/scaleforge/internal/middleware"
 	"github.com/scaleforge/scaleforge/internal/pricing"
 	"github.com/scaleforge/scaleforge/internal/repository"
@@ -64,6 +65,14 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 	}
 	tutorService := tutor.NewService(tutorProvider, catalogService, deps.Store)
 
+	// User-authored courses reuse the same LLM provider for AI generation; CRUD
+	// works without a key (generation just reports itself disabled).
+	var courseProvider course.Provider
+	if assistProvider != nil {
+		courseProvider = assistProvider
+	}
+	courseService := course.NewService(courseProvider, catalogService, deps.Store)
+
 	archHandler := NewArchitectureHandler(deps.Store, catalogService, deps.Store)
 	simHandler := NewSimulationHandler(simService, catalogService, achievementsService)
 	authHandler := NewAuthHandler(authService)
@@ -72,6 +81,7 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 	runtimeHandler := NewRuntimeHandler(runtimepkg.NewCatalog())
 	assistHandler := NewAssistHandler(assistService)
 	tutorHandler := NewTutorHandler(tutorService)
+	courseHandler := NewCourseHandler(courseService)
 
 	// Per-IP rate limiters guarding the endpoints worth protecting: auth (brute
 	// force / account enumeration) and the compute-heavy simulation endpoints.
@@ -124,6 +134,15 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 
 		authed.GET("/tutor/progress", tutorHandler.ListProgress)
 		authed.PUT("/tutor/progress/:slug", tutorHandler.UpdateProgress)
+
+		// User-authored Learn courses: CRUD + AI draft generation. They merge
+		// into the same catalog and play through the same lesson player.
+		authed.GET("/courses", courseHandler.List)
+		authed.POST("/courses", courseHandler.Create)
+		authed.POST("/courses/generate", courseHandler.Generate)
+		authed.GET("/courses/:id", courseHandler.Get)
+		authed.PUT("/courses/:id", courseHandler.Update)
+		authed.DELETE("/courses/:id", courseHandler.Delete)
 	}
 
 	return r
@@ -137,4 +156,5 @@ var (
 	_ auth.UserRepository               = (*postgres.Store)(nil)
 	_ achievements.Repository           = (*postgres.Store)(nil)
 	_ tutor.Repository                  = (*postgres.Store)(nil)
+	_ course.Repository                 = (*postgres.Store)(nil)
 )

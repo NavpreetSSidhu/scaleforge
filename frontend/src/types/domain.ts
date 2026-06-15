@@ -254,12 +254,19 @@ export interface CourseStep {
   callout?: string;
 }
 
+export type CourseDifficulty = 'Beginner' | 'Intermediate' | 'Advanced';
+export type CourseKind = 'system-design' | 'lld';
+
 /** An authored, pre-built course: one design graph revealed step by step. */
 export interface Course {
+  /** DB id for user-created courses; absent on the static built-ins. */
+  id?: string;
+  /** True for user-created courses — distinguishes them in the merged catalog. */
+  isCustom?: boolean;
   slug: string;
   title: string;
   summary: string;
-  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+  difficulty: CourseDifficulty;
   category: string;
   /**
    * Course flavour. 'system-design' (default) courses teach an infra graph and
@@ -306,4 +313,27 @@ export interface CourseProgress {
   completedSteps: number[];
   completed: boolean;
   updatedAt?: string;
+}
+
+/**
+ * The editable payload for creating/updating a user course, and the shape the
+ * AI generator returns (sans persistence envelope). Mirrors the backend
+ * CourseInput / generated draft.
+ */
+export interface CourseDraft {
+  title: string;
+  summary: string;
+  difficulty: CourseDifficulty;
+  category: string;
+  kind: CourseKind;
+  graph: Graph;
+  steps: CourseStep[];
+  solution?: { language: string; code: string };
+}
+
+/** Request body for AI course generation (POST /courses/generate). */
+export interface GenerateCourseRequest {
+  prompt: string;
+  kind: CourseKind;
+  difficulty: CourseDifficulty;
 }
