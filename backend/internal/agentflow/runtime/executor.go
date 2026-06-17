@@ -30,6 +30,22 @@ func NewExecutor(cat *agentflow.Catalog, provider assist.Provider) *Executor {
 	return &Executor{cat: cat, provider: provider}
 }
 
+// textCompleter is the optional plain-text completion path. Agent LLM steps emit
+// natural language, not JSON, so when the provider supports it (the Groq provider
+// does) we use CompleteText to avoid forcing JSON mode.
+type textCompleter interface {
+	CompleteText(ctx context.Context, system, user string) (string, error)
+}
+
+// complete calls the provider in text mode when available, else falls back to the
+// JSON-mode Complete (e.g. test fakes that only implement the base interface).
+func (e *Executor) complete(ctx context.Context, system, user string) (string, error) {
+	if tc, ok := e.provider.(textCompleter); ok {
+		return tc.CompleteText(ctx, system, user)
+	}
+	return e.provider.Complete(ctx, system, user)
+}
+
 // Enabled reports whether live runs are available (an LLM provider is configured).
 func (e *Executor) Enabled() bool { return e.provider != nil }
 
@@ -202,7 +218,7 @@ func (e *Executor) runLLM(ctx context.Context, n agentflow.Node, def agentflow.N
 		if ctx.Err() != nil {
 			return "", 0, 0, ctx.Err()
 		}
-		reply, err = e.provider.Complete(ctx, system, user)
+		reply, err = e.complete(ctx, system, user)
 		if err == nil {
 			return reply, estimateTokens(system + user), estimateTokens(reply), nil
 		}
