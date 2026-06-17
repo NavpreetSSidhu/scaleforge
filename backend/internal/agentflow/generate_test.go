@@ -3,6 +3,7 @@ package agentflow
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -73,6 +74,55 @@ func TestGenerateDisabledWithoutProvider(t *testing.T) {
 	_, err := svc.GenerateDraft(context.Background(), GenerateInput{Prompt: "x"})
 	if !errors.Is(err, ErrDisabled) {
 		t.Fatalf("expected ErrDisabled, got %v", err)
+	}
+}
+
+// In JSON mode the model still returns syntactically valid JSON, but for a tool
+// node it tends to inline toolSchema as an object and quote numeric config
+// values. These shapes must decode, not be rejected as "unparseable JSON".
+func TestGenerateToleratesLLMConfigShapes(t *testing.T) {
+	cat := NewCatalog()
+	reply := `{
+      "name": "Support Agent",
+      "description": "Answers from KB, escalates when unsure.",
+      "graph": {
+        "nodes": [
+          {"id":"in","type":"input","label":"Question"},
+          {"id":"ret","type":"retriever","label":"KB"},
+          {"id":"gen","type":"llm","label":"Answer","config":{"prompt":"Answer","temperature":"0.3","maxTokens":"512"}},
+          {"id":"rt","type":"router","label":"Confident?","config":{"condition":"confidence < 0.5"}},
+          {"id":"esc","type":"tool","label":"Escalate","config":{"toolName":"escalate_to_human","toolSchema":{"type":"object","properties":{"reason":{"type":"string"}}}}},
+          {"id":"out","type":"output","label":"Reply"}
+        ],
+        "edges": [
+          {"id":"e1","source":"in","target":"ret"},
+          {"id":"e2","source":"ret","target":"gen"},
+          {"id":"e3","source":"gen","target":"rt"},
+          {"id":"e4","source":"rt","target":"out","label":"confident"},
+          {"id":"e5","source":"rt","target":"esc","label":"unsure"},
+          {"id":"e6","source":"esc","target":"out"}
+        ]
+      }
+    }`
+	svc := NewService(stubProvider{reply: reply}, cat, nil)
+	w, err := svc.GenerateDraft(context.Background(), GenerateInput{Prompt: "support agent"})
+	if err != nil {
+		t.Fatalf("generate failed on LLM config shapes: %v", err)
+	}
+	var gen, tool Node
+	for _, n := range w.Graph.Nodes {
+		switch n.ID {
+		case "gen":
+			gen = n
+		case "esc":
+			tool = n
+		}
+	}
+	if gen.Config.Temperature != 0.3 || gen.Config.MaxTokens != 512 {
+		t.Fatalf("quoted numerics not coerced: %+v", gen.Config)
+	}
+	if !strings.Contains(tool.Config.ToolSchema, "properties") {
+		t.Fatalf("object toolSchema not preserved as text: %q", tool.Config.ToolSchema)
 	}
 }
 
