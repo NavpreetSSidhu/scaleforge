@@ -22,6 +22,16 @@ import type {
   TutorExplainRequest,
   TutorReply,
 } from '@/types/domain';
+import type {
+  AgentGraph,
+  AgentNodeKind,
+  ExportBundle,
+  ExportTarget,
+  RunEvent,
+  SimResult,
+  VectorBenchResult,
+  Workflow,
+} from '@/types/agentflow';
 import type { AuthUser } from '@/store/authStore';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
@@ -175,4 +185,96 @@ export const api = {
 
   generateCourse: (payload: GenerateCourseRequest) =>
     request<Course>('/courses/generate', { method: 'POST', body: JSON.stringify(payload) }),
+
+  // --- Agent Studio (agentic workflows) ---
+
+  getAgentflowCatalog: () =>
+    request<{ nodeTypes: AgentNodeKind[] }>('/agentflow/catalog').then((r) => r.nodeTypes),
+
+  simulateWorkflow: (payload: { graph: AgentGraph; trials?: number; seed?: number }) =>
+    request<SimResult>('/agentflow/simulate', { method: 'POST', body: JSON.stringify(payload) }),
+
+  vectorBench: (payload: { corpusSize?: number; dim?: number; k?: number; queries?: number }) =>
+    request<VectorBenchResult>('/agentflow/vector-bench', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  exportWorkflow: (payload: {
+    name: string;
+    description?: string;
+    graph: AgentGraph;
+    targets?: ExportTarget[];
+  }) =>
+    request<ExportBundle>('/agentflow/export', { method: 'POST', body: JSON.stringify(payload) }),
+
+  getAgentRunStatus: () => request<{ enabled: boolean }>('/agentflow/run'),
+
+  generateWorkflow: (payload: { prompt: string }) =>
+    request<Workflow>('/workflows/generate', { method: 'POST', body: JSON.stringify(payload) }),
+
+  listWorkflows: () =>
+    request<{ workflows: Workflow[] }>('/workflows').then((r) => r.workflows),
+
+  getWorkflow: (id: string) => request<Workflow>(`/workflows/${id}`),
+
+  createWorkflow: (payload: { name: string; description?: string; graph: AgentGraph }) =>
+    request<Workflow>('/workflows', { method: 'POST', body: JSON.stringify(payload) }),
+
+  updateWorkflow: (id: string, payload: { name: string; description?: string; graph: AgentGraph }) =>
+    request<Workflow>(`/workflows/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+
+  deleteWorkflow: (id: string) => request<void>(`/workflows/${id}`, { method: 'DELETE' }),
 };
+
+/**
+ * runWorkflowStream POSTs a workflow and reads the Server-Sent Events the Go
+ * runtime emits (one per executed step), invoking onEvent for each. Returns when
+ * the stream ends. Uses fetch streaming rather than EventSource because the run
+ * is a POST with a body and an Authorization header.
+ */
+export async function runWorkflowStream(
+  payload: { graph: AgentGraph; input?: string },
+  onEvent: (ev: RunEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const token = tokenProvider();
+  const response = await fetch(`${API_BASE}/agentflow/run`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(payload),
+    signal,
+  });
+  if (!response.ok || !response.body) {
+    const error = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(error.error ?? 'Run failed');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    // SSE frames are separated by a blank line; each `data:` line is one JSON event.
+    let sep: number;
+    while ((sep = buffer.indexOf('\n\n')) !== -1) {
+      const frame = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      for (const line of frame.split('\n')) {
+        const trimmed = line.startsWith('data:') ? line.slice(5).trim() : '';
+        if (trimmed) {
+          try {
+            onEvent(JSON.parse(trimmed) as RunEvent);
+          } catch {
+            /* ignore keep-alives / malformed frames */
+          }
+        }
+      }
+    }
+  }
+}

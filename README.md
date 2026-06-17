@@ -299,6 +299,62 @@ When `GROQ_API_KEY` is set, each lesson exposes an optional AI **Tutor** (slide-
 envelope. The tutor is rate-limited per client; lessons and animations work fully without a
 key (the AI entry points are simply hidden).
 
+## Agent Studio
+
+The **Studio** tab extends ScaleForge from *infrastructure* design into **agentic / LLM
+infrastructure**: visually design a RAG / agent workflow (input → retriever → LLM → tools →
+router/loops → output), simulate its cost, latency, and token economics, run it live, and
+**export runnable code + prompts** to LangGraph, LangChain, Go, or a portable spec. It is a
+showcase of Go's strengths — concurrency and from-scratch systems work — across three engines.
+
+```mermaid
+flowchart TB
+  subgraph FE["Frontend — Studio view (React Flow + Zustand)"]
+    Canvas[Workflow canvas + palette + node inspector]
+    Panels[Simulate · Vectors · Run · Export · Generate]
+  end
+  subgraph BE["Go backend — internal/agentflow"]
+    Sim["sim/ — concurrent Monte-Carlo<br/>errgroup worker pool → p50/p95/p99"]
+    Vec["vector/ — pure-Go ANN<br/>Flat · IVF · HNSW + scalar/product quantization"]
+    Run["runtime/ — Go-native DAG executor<br/>errgroup · context · retries · routing"]
+    Exp["export/ — LangGraph · LangChain · Go · JSON+Mermaid"]
+    Gen["generate — AI workflow scaffold"]
+    Sim --> Vec
+    Run --> Vec
+    Run -->|LLM steps| Groq[(assist.Provider → Groq)]
+    Gen --> Groq
+  end
+  FE -->|/agentflow/*| BE
+  Run -->|SSE step events| Panels
+  BE --> PG[(Postgres — workflows table)]
+```
+
+**Three Go engines power it:**
+
+- **Concurrent Monte-Carlo simulator** (`internal/agentflow/sim`). LLM latency is heavy-tailed
+  and step costs compound, so a single number misleads. Thousands of randomized trials fan out
+  across `GOMAXPROCS` workers (`errgroup`, per-worker RNG, lock-free output slices); the result
+  is the **p50/p95/p99** distribution of end-to-end latency and cost, per-node hotspots, the
+  critical path, and the bottleneck. Loops amplify cost; routers prune branches.
+- **Pure-Go vector engine** (`internal/agentflow/vector`) — a from-scratch ANN library: exact
+  **Flat**, **IVF** (k-means coarse quantizer + nprobe), and **HNSW** (hierarchical graph with
+  the neighbour-diversity heuristic), plus **scalar** and **product quantization**. The
+  `/agentflow/vector-bench` endpoint reports the *real* recall@k ↔ query-latency ↔ memory
+  trade-off; an analytical model feeds each retriever node's latency into the simulator.
+- **Go-native DAG runtime** (`internal/agentflow/runtime`) — executes a workflow live:
+  independent branches run concurrently (`errgroup`), the run is bounded by a `context`
+  deadline, LLM steps retry with backoff, routers pick a branch from the query, and retriever
+  steps query the real vector index. Each step streams to the UI over **Server-Sent Events**.
+
+**Export** (`/agentflow/export`) emits a **LangGraph** `StateGraph`, a **LangChain** script, a
+self-contained **Go** program, and a portable **`workflow.json` + Mermaid diagram + prompt
+pack** — every target with the workflow's generated prompts and tool schemas inlined. Design,
+simulation, vector-bench, and export need **no API key**; the **live run** and **AI workflow
+generation** reuse the same Groq seam as the assistant (key-gated + rate-limited).
+
+Endpoints: `GET /agentflow/catalog`, `POST /agentflow/{simulate,vector-bench,export}` (guest),
+`GET|POST /agentflow/run` (SSE), and authed `…/workflows` CRUD + `POST /workflows/generate`.
+
 ## License
 
 Released under the [MIT License](./LICENSE). See the `LICENSE` file for the full text.
