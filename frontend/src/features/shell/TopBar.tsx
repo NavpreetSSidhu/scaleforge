@@ -6,6 +6,7 @@ import {
   Hammer,
   GitCompareArrows,
   GraduationCap,
+  Bot,
   Smartphone,
   Save,
   Share2,
@@ -40,6 +41,7 @@ const tabs: { id: AppView; label: string; icon: React.ReactNode }[] = [
   { id: 'builder', label: 'Builder', icon: <Hammer className="h-4 w-4" /> },
   { id: 'compare', label: 'Compare', icon: <GitCompareArrows className="h-4 w-4" /> },
   { id: 'learn', label: 'Learn', icon: <GraduationCap className="h-4 w-4" /> },
+  { id: 'studio', label: 'Studio', icon: <Bot className="h-4 w-4" /> },
   { id: 'mobile', label: 'Mobile', icon: <Smartphone className="h-4 w-4" /> },
 ];
 

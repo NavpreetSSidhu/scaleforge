@@ -57,7 +57,7 @@ type chatRequestBody struct {
 	Model          string            `json:"model"`
 	Messages       []chatMessage     `json:"messages"`
 	Temperature    float64           `json:"temperature"`
-	ResponseFormat map[string]string `json:"response_format"`
+	ResponseFormat map[string]string `json:"response_format,omitempty"`
 }
 
 type chatResponseBody struct {
@@ -69,7 +69,20 @@ type chatResponseBody struct {
 	} `json:"error,omitempty"`
 }
 
+// Complete returns the model's reply in JSON mode — the model is constrained to
+// emit a single JSON object, as the assistant/tutor/course contracts require.
 func (p *GroqProvider) Complete(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	return p.complete(ctx, systemPrompt, userPrompt, true)
+}
+
+// CompleteText returns the model's reply as free-form prose (no JSON mode). The
+// agent runtime uses this for LLM steps, whose output is natural language — Groq
+// rejects JSON mode unless the prompt mentions "json", and agent prompts don't.
+func (p *GroqProvider) CompleteText(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	return p.complete(ctx, systemPrompt, userPrompt, false)
+}
+
+func (p *GroqProvider) complete(ctx context.Context, systemPrompt, userPrompt string, jsonMode bool) (string, error) {
 	body := chatRequestBody{
 		Model: p.model,
 		Messages: []chatMessage{
@@ -77,8 +90,10 @@ func (p *GroqProvider) Complete(ctx context.Context, systemPrompt, userPrompt st
 			{Role: "user", Content: userPrompt},
 		},
 		Temperature: 0.3,
+	}
+	if jsonMode {
 		// JSON mode: the model must return a single JSON object matching our contract.
-		ResponseFormat: map[string]string{"type": "json_object"},
+		body.ResponseFormat = map[string]string{"type": "json_object"}
 	}
 
 	payload, err := json.Marshal(body)

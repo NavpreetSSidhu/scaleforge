@@ -6,6 +6,8 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/scaleforge/scaleforge/internal/achievements"
+	"github.com/scaleforge/scaleforge/internal/agentflow"
+	agentruntime "github.com/scaleforge/scaleforge/internal/agentflow/runtime"
 	"github.com/scaleforge/scaleforge/internal/assist"
 	"github.com/scaleforge/scaleforge/internal/auth"
 	"github.com/scaleforge/scaleforge/internal/catalog"
@@ -73,6 +75,17 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 	}
 	courseService := course.NewService(courseProvider, catalogService, deps.Store)
 
+	// Agent Studio reuses the same LLM provider for AI workflow generation and the
+	// live dry-run runtime; design, simulation, vector-bench, and export all work
+	// without a key (those operations just don't touch the provider).
+	var agentProvider assist.Provider
+	if assistProvider != nil {
+		agentProvider = assistProvider
+	}
+	agentflowCatalog := agentflow.NewCatalog()
+	agentflowService := agentflow.NewService(agentProvider, agentflowCatalog, deps.Store)
+	agentExecutor := agentruntime.NewExecutor(agentflowCatalog, agentProvider)
+
 	archHandler := NewArchitectureHandler(deps.Store, catalogService, deps.Store)
 	simHandler := NewSimulationHandler(simService, catalogService, achievementsService)
 	authHandler := NewAuthHandler(authService)
@@ -82,6 +95,7 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 	assistHandler := NewAssistHandler(assistService)
 	tutorHandler := NewTutorHandler(tutorService)
 	courseHandler := NewCourseHandler(courseService)
+	agentflowHandler := NewAgentflowHandler(agentflowService, agentExecutor)
 
 	// Per-IP rate limiters guarding the endpoints worth protecting: auth (brute
 	// force / account enumeration) and the compute-heavy simulation endpoints.
@@ -115,6 +129,15 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 		guest.GET("/tutor", tutorHandler.Status)
 		guest.POST("/tutor/explain", tutorHandler.Explain)
 		guest.POST("/tutor/ask", tutorHandler.Ask)
+
+		// Agent Studio: the node-type palette and pure design-time operations are
+		// guest-friendly. Simulate is compute-heavy, so it shares the sim limiter.
+		guest.GET("/agentflow/catalog", agentflowHandler.GetCatalog)
+		guest.POST("/agentflow/simulate", simLimiter.Middleware(), agentflowHandler.Simulate)
+		guest.POST("/agentflow/vector-bench", simLimiter.Middleware(), agentflowHandler.VectorBench)
+		guest.POST("/agentflow/export", agentflowHandler.Export)
+		guest.GET("/agentflow/run", agentflowHandler.RunStatus)
+		guest.POST("/agentflow/run", agentflowHandler.Run)
 	}
 
 	// Account-only: saving/loading architectures and fetching the profile.
@@ -144,6 +167,15 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 		authed.GET("/courses/:id", courseHandler.Get)
 		authed.PUT("/courses/:id", courseHandler.Update)
 		authed.DELETE("/courses/:id", courseHandler.Delete)
+
+		// Agent Studio workflows: CRUD + AI draft generation. Generate is POST-only
+		// so it never collides with the /:id routes.
+		authed.GET("/workflows", agentflowHandler.List)
+		authed.POST("/workflows", agentflowHandler.Create)
+		authed.POST("/workflows/generate", agentflowHandler.Generate)
+		authed.GET("/workflows/:id", agentflowHandler.Get)
+		authed.PUT("/workflows/:id", agentflowHandler.Update)
+		authed.DELETE("/workflows/:id", agentflowHandler.Delete)
 	}
 
 	return r
@@ -158,4 +190,5 @@ var (
 	_ achievements.Repository           = (*postgres.Store)(nil)
 	_ tutor.Repository                  = (*postgres.Store)(nil)
 	_ course.Repository                 = (*postgres.Store)(nil)
+	_ agentflow.Repository              = (*postgres.Store)(nil)
 )
