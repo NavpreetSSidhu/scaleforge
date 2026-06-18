@@ -22,11 +22,13 @@ import {
 import { useArchitectureStore, type AppView } from '@/store/architectureStore';
 import { useAuthStore } from '@/store/authStore';
 import { useAssistantStore } from '@/store/assistantStore';
+import { useStudioAssistantStore } from '@/store/studioAssistantStore';
 import { useSnackbar } from '@/store/snackbarStore';
 import { buildShareLink, downloadArchitecture } from '@/lib/share';
 import { ProfileMenu } from '@/features/auth/ProfileMenu';
 import { ProviderSelector } from '@/features/shell/ProviderSelector';
 import { useAssistantEnabled } from '@/features/assistant/AssistantDrawer';
+import { useAgentRunEnabled } from '@/features/studio/useAgentflow';
 import { Tooltip } from '@/components/Tooltip';
 import { Spinner } from '@/components/Spinner';
 
@@ -70,8 +72,15 @@ export function TopBar({ onRun, isRunning, onSave, isSaving }: TopBarProps) {
     setInspectorOpen,
   } = useArchitectureStore();
   const { user, openAuthPrompt, guestRunsLeft } = useAuthStore();
-  const toggleAssistant = useAssistantStore((s) => s.toggle);
-  const assistantEnabled = useAssistantEnabled();
+  // The AI assistant button + the Run button are view-aware: in Agent Studio they
+  // drive the studio assistant / live workflow run; elsewhere the infra ones.
+  const inStudio = view === 'studio';
+  const toggleInfraAssistant = useAssistantStore((s) => s.toggle);
+  const toggleStudioAssistant = useStudioAssistantStore((s) => s.toggle);
+  const infraAssistantEnabled = useAssistantEnabled();
+  const studioAssistantEnabled = useAgentRunEnabled();
+  const assistantEnabled = inStudio ? studioAssistantEnabled : infraAssistantEnabled;
+  const toggleAssistant = inStudio ? toggleStudioAssistant : toggleInfraAssistant;
   const pushSnack = useSnackbar((s) => s.push);
   const isGuest = user == null;
   const [envOpen, setEnvOpen] = useState(false);
@@ -249,10 +258,12 @@ export function TopBar({ onRun, isRunning, onSave, isSaving }: TopBarProps) {
           </Tooltip>
         )}
 
-        <Tooltip label="Run load simulation (⌘⏎)">
+        <Tooltip label={inStudio ? 'Run agent workflow live (⌘⏎)' : 'Run load simulation (⌘⏎)'}>
           <button type="button" onClick={onRun} disabled={isRunning} className="btn-primary">
             {isRunning ? <Spinner className="h-4 w-4" /> : <Play className="h-4 w-4" fill="currentColor" />}
-            <span className="hidden sm:inline">{isRunning ? 'Running…' : 'Run Simulation'}</span>
+            <span className="hidden sm:inline">
+              {isRunning ? 'Running…' : inStudio ? 'Run Agent' : 'Run Simulation'}
+            </span>
             <span className="ml-0.5 hidden rounded bg-black/20 px-1 font-mono text-[10px] lg:inline">⌘⏎</span>
           </button>
         </Tooltip>

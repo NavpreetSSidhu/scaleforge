@@ -1,35 +1,31 @@
 import { useState } from 'react';
-import { SlidersHorizontal, Gauge, Database, Play, FileCode2, Sparkles } from 'lucide-react';
+import { SlidersHorizontal, Gauge, Database, FileCode2 } from 'lucide-react';
 import { useStudioStore } from '@/store/studioStore';
 import { WorkflowPalette } from './WorkflowPalette';
 import { WorkflowCanvas } from './WorkflowCanvas';
+import { StudioRunBar } from './StudioRunBar';
 import { NodeInspector } from './NodeInspector';
 import { SimPanel } from './panels/SimPanel';
 import { VectorBenchPanel } from './panels/VectorBenchPanel';
-import { RunPanel } from './panels/RunPanel';
 import { ExportPanel } from './panels/ExportPanel';
-import { GeneratePanel } from './panels/GeneratePanel';
-import { useAgentRunEnabled } from './useAgentflow';
 
-type Tab = 'inspect' | 'simulate' | 'vectors' | 'run' | 'export' | 'generate';
+type Tab = 'inspect' | 'simulate' | 'vectors' | 'export';
 
-const tabs: { id: Tab; label: string; icon: React.ReactNode; aiOnly?: boolean }[] = [
+const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'inspect', label: 'Inspect', icon: <SlidersHorizontal className="h-4 w-4" /> },
   { id: 'simulate', label: 'Simulate', icon: <Gauge className="h-4 w-4" /> },
   { id: 'vectors', label: 'Vectors', icon: <Database className="h-4 w-4" /> },
-  { id: 'run', label: 'Run', icon: <Play className="h-4 w-4" />, aiOnly: true },
   { id: 'export', label: 'Export', icon: <FileCode2 className="h-4 w-4" /> },
-  { id: 'generate', label: 'Generate', icon: <Sparkles className="h-4 w-4" />, aiOnly: true },
 ];
 
 /** Agent Studio: design an agentic workflow, simulate its cost/latency, benchmark
- *  the vector engine, run it live, and export runnable code. */
+ *  the vector engine, run it live (top Run button), and export runnable code. AI
+ *  generation/editing lives in the shared assistant drawer (top-bar sparkle). */
 export function StudioView() {
   const { name, setName, nodes, edges } = useStudioStore();
-  const aiEnabled = useAgentRunEnabled();
   const [tab, setTab] = useState<Tab>('inspect');
 
-  const visibleTabs = tabs.filter((t) => !t.aiOnly || aiEnabled);
+  const visibleTabs = tabs;
 
   return (
     <div className="flex min-h-0 flex-1">
@@ -50,6 +46,7 @@ export function StudioView() {
         <div className="min-h-0 flex-1">
           <WorkflowCanvas />
         </div>
+        <StudioRunBar />
       </div>
 
       <aside className="flex h-full w-[340px] shrink-0 flex-col border-l border-white/[0.06] bg-surface/60">
@@ -72,9 +69,7 @@ export function StudioView() {
           {tab === 'inspect' && <NodeInspector />}
           {tab === 'simulate' && <SimPanel />}
           {tab === 'vectors' && <VectorBenchPanel />}
-          {tab === 'run' && <RunPanel />}
           {tab === 'export' && <ExportPanel />}
-          {tab === 'generate' && <GeneratePanel />}
         </div>
       </aside>
     </div>

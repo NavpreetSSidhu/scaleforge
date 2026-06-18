@@ -186,6 +186,38 @@ func (h *AgentflowHandler) Run(c *gin.Context) {
 	})
 }
 
+// Chat is the incremental Agent Studio assistant: it proposes granular workflow
+// edits ({reply, actions[]}) the client previews and applies — the agentflow
+// analog of the infra /assistant endpoint. Guest-friendly but key-gated and
+// rate-limited, with the "enabled?" and limit checks before any token is spent.
+func (h *AgentflowHandler) Chat(c *gin.Context) {
+	if !h.service.Enabled() {
+		c.JSON(http.StatusServiceUnavailable, ErrorResponse{Error: "workflow assistant not configured"})
+		return
+	}
+	if !h.limiter.Allow(c.ClientIP()) {
+		c.JSON(http.StatusTooManyRequests, ErrorResponse{Error: "rate limit reached — please wait a moment"})
+		return
+	}
+	var req agentflow.ChatRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		return
+	}
+	resp, err := h.service.Chat(c.Request.Context(), req)
+	if err != nil {
+		if errors.Is(err, agentflow.ErrDisabled) {
+			c.JSON(http.StatusServiceUnavailable, ErrorResponse{Error: "workflow assistant not configured"})
+			return
+		}
+		// ErrInvalid here means the model returned an unparseable response — a bad
+		// upstream answer, so 502 rather than 422 (the user's input was fine).
+		c.JSON(http.StatusBadGateway, ErrorResponse{Error: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
 // --- account-only CRUD ---
 
 func (h *AgentflowHandler) List(c *gin.Context) {

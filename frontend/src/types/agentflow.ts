@@ -129,6 +129,45 @@ export interface ExportBundle {
   files: ExportFile[];
 }
 
+// --- Agent Studio assistant (incremental workflow chat) ---
+
+export type AgentChatOp =
+  | 'addNode'
+  | 'removeNode'
+  | 'addEdge'
+  | 'removeEdge'
+  | 'updateConfig'
+  | 'setLabel';
+
+/** One proposed workflow mutation from the studio assistant, previewed before it applies. */
+export interface AgentChatAction {
+  op: AgentChatOp;
+  nodeType?: string;
+  nodeId?: string;
+  label?: string;
+  source?: string;
+  target?: string;
+  config?: AgentNodeConfig;
+  rationale?: string;
+}
+
+export interface AgentChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AgentChatResponse {
+  reply: string;
+  actions: AgentChatAction[];
+}
+
+export interface AgentChatRequest {
+  message: string;
+  graph: AgentGraph;
+  input?: string;
+  history?: AgentChatMessage[];
+}
+
 export type RunEventType = 'node_start' | 'node_finish' | 'route' | 'error' | 'done';
 
 export interface RunEvent {

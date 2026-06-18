@@ -138,6 +138,7 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 		guest.POST("/agentflow/export", agentflowHandler.Export)
 		guest.GET("/agentflow/run", agentflowHandler.RunStatus)
 		guest.POST("/agentflow/run", agentflowHandler.Run)
+		guest.POST("/agentflow/chat", agentflowHandler.Chat)
 	}
 
 	// Account-only: saving/loading architectures and fetching the profile.

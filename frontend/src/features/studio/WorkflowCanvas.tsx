@@ -35,7 +35,6 @@ function CanvasInner() {
   const {
     nodes,
     edges,
-    selectedNodeId,
     runStatus,
     addNode,
     moveNode,
@@ -48,24 +47,30 @@ function CanvasInner() {
 
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState<AgentNodeData>([]);
 
+  // React Flow owns selection state; the store is the source of truth for
+  // structure/labels/run status only. Keeping `selectedNodeId` out of the sync
+  // signature avoids a select -> store -> full-rebuild feedback loop that made
+  // nodes flicker out of selection (the "won't stay selected" bug).
   const syncSig = useMemo(
     () =>
       nodes
         .map((n) => `${n.id}@${n.position.x},${n.position.y}:${n.label}:${n.type}:${runStatus[n.id] ?? ''}`)
-        .join('|') + `#${selectedNodeId}`,
-    [nodes, selectedNodeId, runStatus],
+        .join('|'),
+    [nodes, runStatus],
   );
 
   useEffect(() => {
-    setRfNodes(
-      nodes.map((n) => ({
+    setRfNodes((prev) => {
+      const prevById = new Map(prev.map((p) => [p.id, p]));
+      return nodes.map((n) => ({
         id: n.id,
         type: 'agent',
         position: n.position,
-        selected: n.id === selectedNodeId,
+        // preserve React Flow's own selection across re-syncs
+        selected: prevById.get(n.id)?.selected ?? false,
         data: { label: n.label, type: n.type, status: runStatus[n.id] },
-      })),
-    );
+      }));
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syncSig]);
 

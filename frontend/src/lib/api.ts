@@ -23,6 +23,8 @@ import type {
   TutorReply,
 } from '@/types/domain';
 import type {
+  AgentChatRequest,
+  AgentChatResponse,
   AgentGraph,
   AgentNodeKind,
   ExportBundle,
@@ -212,6 +214,12 @@ export const api = {
 
   generateWorkflow: (payload: { prompt: string }) =>
     request<Workflow>('/workflows/generate', { method: 'POST', body: JSON.stringify(payload) }),
+
+  agentChat: (payload: AgentChatRequest) =>
+    request<AgentChatResponse>('/agentflow/chat', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 
   listWorkflows: () =>
     request<{ workflows: Workflow[] }>('/workflows').then((r) => r.workflows),

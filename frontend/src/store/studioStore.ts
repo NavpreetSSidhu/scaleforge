@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AgentEdge, AgentGraph, AgentNode, AgentNodeConfig } from '@/types/agentflow';
+import type { AgentEdge, AgentGraph, AgentNode, AgentNodeConfig, RunEvent } from '@/types/agentflow';
 
 let seq = 0;
 /** Short unique id for new nodes/edges (stable within a session). */
@@ -52,9 +52,21 @@ interface StudioState {
   input: string;
   /** Per-node status during a live run, used by the canvas glow. */
   runStatus: Record<string, 'running' | 'done' | 'error'>;
+  /** Live-run state, driven by the top-level Run button (see [[useStudioRun]])
+   *  and surfaced in the run-output strip below the canvas. */
+  running: boolean;
+  runEvents: RunEvent[];
+  runFinal: string;
+  runError: string;
 
   setNodeStatus: (id: string, status: 'running' | 'done' | 'error') => void;
   clearRunStatus: () => void;
+  /** Reset run output and mark a run as started. */
+  beginRun: () => void;
+  pushRunEvent: (ev: RunEvent) => void;
+  setRunFinal: (output: string) => void;
+  setRunError: (error: string) => void;
+  setRunning: (running: boolean) => void;
   setName: (name: string) => void;
   setDescription: (description: string) => void;
   setInput: (input: string) => void;
@@ -87,9 +99,18 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   selectedNodeId: null,
   input: 'How does adding a cache improve a system?',
   runStatus: {},
+  running: false,
+  runEvents: [],
+  runFinal: '',
+  runError: '',
 
   setNodeStatus: (id, status) => set((s) => ({ runStatus: { ...s.runStatus, [id]: status } })),
   clearRunStatus: () => set({ runStatus: {} }),
+  beginRun: () => set({ running: true, runEvents: [], runFinal: '', runError: '', runStatus: {} }),
+  pushRunEvent: (ev) => set((s) => ({ runEvents: [...s.runEvents, ev] })),
+  setRunFinal: (runFinal) => set({ runFinal }),
+  setRunError: (runError) => set({ runError }),
+  setRunning: (running) => set({ running }),
   setName: (name) => set({ name }),
   setDescription: (description) => set({ description }),
   setInput: (input) => set({ input }),

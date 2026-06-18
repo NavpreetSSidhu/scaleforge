@@ -12,8 +12,11 @@ import { CompareView } from '@/features/compare/CompareView';
 import { MobileView } from '@/features/mobile/MobileView';
 import { LearnView } from '@/features/learn/LearnView';
 import { StudioView } from '@/features/studio/StudioView';
+import { useStudioRun } from '@/features/studio/useStudioRun';
+import { useStudioStore } from '@/store/studioStore';
 import { ReportDrawer } from '@/features/report/ReportDrawer';
 import { AssistantDrawer } from '@/features/assistant/AssistantDrawer';
+import { StudioAssistantDrawer } from '@/features/studio/StudioAssistantDrawer';
 import { TutorDrawer } from '@/features/learn/TutorDrawer';
 import { AuthModal } from '@/features/auth/AuthModal';
 import { AchievementToaster } from '@/features/achievements/AchievementToast';
@@ -88,6 +91,14 @@ export default function App() {
     simulate.mutate();
   };
 
+  // In Agent Studio the top-level Run button drives the live workflow dry-run
+  // (key-gated + rate-limited server-side) instead of the infra simulation.
+  const studioRun = useStudioRun();
+  const studioRunning = useStudioStore((s) => s.running);
+  const inStudio = view === 'studio';
+  const onRun = inStudio ? studioRun.start : runSimulation;
+  const isRunning = inStudio ? studioRunning : simulate.isPending;
+
   const requestSave = () => {
     const auth = useAuthStore.getState();
     if (!auth.user) {
@@ -144,7 +155,8 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
-        runSimulation();
+        if (useArchitectureStore.getState().view === 'studio') studioRun.start();
+        else runSimulation();
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
@@ -159,8 +171,8 @@ export default function App() {
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-base text-ink">
       <TopBar
-        onRun={runSimulation}
-        isRunning={simulate.isPending}
+        onRun={onRun}
+        isRunning={isRunning}
         onSave={() => save.mutate()}
         isSaving={save.isPending}
       />
@@ -174,6 +186,7 @@ export default function App() {
 
       <ReportDrawer />
       <AssistantDrawer onRun={runSimulation} />
+      <StudioAssistantDrawer />
       <TutorDrawer />
       <AuthModal />
       <AchievementToaster />
