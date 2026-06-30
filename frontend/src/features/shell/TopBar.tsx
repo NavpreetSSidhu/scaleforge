@@ -6,6 +6,7 @@ import {
   Hammer,
   GitCompareArrows,
   GraduationCap,
+  MessagesSquare,
   Bot,
   Smartphone,
   Save,
@@ -18,16 +19,19 @@ import {
   LogIn,
   MoreHorizontal,
   Sparkles,
+  ShieldCheck,
 } from 'lucide-react';
 import { useArchitectureStore, type AppView } from '@/store/architectureStore';
 import { useAuthStore } from '@/store/authStore';
 import { useAssistantStore } from '@/store/assistantStore';
 import { useStudioAssistantStore } from '@/store/studioAssistantStore';
+import { useReviewStore } from '@/store/reviewStore';
 import { useSnackbar } from '@/store/snackbarStore';
 import { buildShareLink, downloadArchitecture } from '@/lib/share';
 import { ProfileMenu } from '@/features/auth/ProfileMenu';
 import { ProviderSelector } from '@/features/shell/ProviderSelector';
 import { useAssistantEnabled } from '@/features/assistant/AssistantDrawer';
+import { useReviewEnabled } from '@/features/review/ReviewDrawer';
 import { useAgentRunEnabled } from '@/features/studio/useAgentflow';
 import { Tooltip } from '@/components/Tooltip';
 import { Spinner } from '@/components/Spinner';
@@ -43,6 +47,7 @@ const tabs: { id: AppView; label: string; icon: React.ReactNode }[] = [
   { id: 'builder', label: 'Builder', icon: <Hammer className="h-4 w-4" /> },
   { id: 'compare', label: 'Compare', icon: <GitCompareArrows className="h-4 w-4" /> },
   { id: 'learn', label: 'Learn', icon: <GraduationCap className="h-4 w-4" /> },
+  { id: 'interview', label: 'Interview', icon: <MessagesSquare className="h-4 w-4" /> },
   { id: 'studio', label: 'Studio', icon: <Bot className="h-4 w-4" /> },
   { id: 'mobile', label: 'Mobile', icon: <Smartphone className="h-4 w-4" /> },
 ];
@@ -81,6 +86,10 @@ export function TopBar({ onRun, isRunning, onSave, isSaving }: TopBarProps) {
   const studioAssistantEnabled = useAgentRunEnabled();
   const assistantEnabled = inStudio ? studioAssistantEnabled : infraAssistantEnabled;
   const toggleAssistant = inStudio ? toggleStudioAssistant : toggleInfraAssistant;
+
+  // The SRE reviewer is an infra-only audit; shown when configured and not in Studio.
+  const reviewEnabled = useReviewEnabled();
+  const openReview = useReviewStore((s) => s.setOpen);
   const pushSnack = useSnackbar((s) => s.push);
   const isGuest = user == null;
   const [envOpen, setEnvOpen] = useState(false);
@@ -243,6 +252,20 @@ export function TopBar({ onRun, isRunning, onSave, isSaving }: TopBarProps) {
             </div>
           )}
         </div>
+
+        {!inStudio && reviewEnabled && (
+          <Tooltip label="AI SRE review — audit grounded in your sim results">
+            <button
+              type="button"
+              aria-label="Open SRE review"
+              onClick={() => openReview(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-surface-panel px-2.5 py-1.5 text-sm text-ink-muted transition hover:bg-surface-hover hover:text-ink"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              <span className="hidden lg:inline">Review</span>
+            </button>
+          </Tooltip>
+        )}
 
         {assistantEnabled && (
           <Tooltip label="AI architecture assistant">

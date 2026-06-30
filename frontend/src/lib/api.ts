@@ -12,9 +12,21 @@ import type {
   CourseProgress,
   GenerateCourseRequest,
   Graph,
+  InterviewGradeRequest,
+  InterviewGradeResponse,
+  InterviewStartResponse,
+  InterviewTopic,
+  InterviewTurnRequest,
+  InterviewTurnResponse,
+  LiveSimRequest,
+  LiveTick,
   NodeDefinition,
   PricingProvider,
+  ReviewRequest,
+  ReviewResponse,
   RuntimeCatalog,
+  SandboxEvent,
+  SandboxRequest,
   SimulateRequest,
   SimulationResult,
   TrafficProfile,
@@ -103,6 +115,37 @@ export const api = {
 
   assistant: (payload: AssistantRequest) =>
     request<AssistantResponse>('/assistant', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getInterviewStatus: () =>
+    request<{ enabled: boolean; topics: InterviewTopic[] }>('/interview'),
+
+  startInterview: (topic?: string) =>
+    request<InterviewStartResponse>('/interview/start', {
+      method: 'POST',
+      body: JSON.stringify({ topic: topic ?? '' }),
+    }),
+
+  interviewTurn: (payload: InterviewTurnRequest) =>
+    request<InterviewTurnResponse>('/interview/turn', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  interviewGrade: (payload: InterviewGradeRequest) =>
+    request<InterviewGradeResponse>('/interview/grade', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getSandboxStatus: () => request<{ enabled: boolean }>('/sandbox'),
+
+  getReviewStatus: () => request<{ enabled: boolean }>('/review'),
+
+  review: (payload: ReviewRequest) =>
+    request<ReviewResponse>('/review', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
@@ -261,7 +304,70 @@ export async function runWorkflowStream(
     throw new Error(error.error ?? 'Run failed');
   }
 
-  const reader = response.body.getReader();
+  await readSSE(response, onEvent);
+}
+
+/**
+ * runLiveSimStream POSTs an architecture + traffic to the discrete-event
+ * simulator and reads the Server-Sent Events it emits (one Tick per simulated
+ * time slice), invoking onTick for each. Same fetch-streaming approach as
+ * runWorkflowStream (POST with a body, so not EventSource).
+ */
+export async function runLiveSimStream(
+  payload: LiveSimRequest,
+  onTick: (tick: LiveTick) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const token = tokenProvider();
+  const response = await fetch(`${API_BASE}/simulate/live`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(payload),
+    signal,
+  });
+  if (!response.ok || !response.body) {
+    const error = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(error.error ?? 'Live simulation failed');
+  }
+  await readSSE(response, onTick);
+}
+
+/**
+ * runSandboxStream POSTs a design to the Real Sandbox and reads the Server-Sent
+ * Events it emits (phase, progress, done) as it stands the design up and load-
+ * tests it. Same fetch-streaming approach as the other streams.
+ */
+export async function runSandboxStream(
+  payload: SandboxRequest,
+  onEvent: (ev: SandboxEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const token = tokenProvider();
+  const response = await fetch(`${API_BASE}/sandbox/run`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(payload),
+    signal,
+  });
+  if (!response.ok || !response.body) {
+    const error = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(error.error ?? 'Sandbox run failed');
+  }
+  await readSSE(response, onEvent);
+}
+
+/**
+ * readSSE drains a streaming fetch Response, parsing each SSE `data:` line as one
+ * JSON event of type T. Shared by the workflow-run, live-sim, and sandbox streams.
+ */
+async function readSSE<T>(response: Response, onEvent: (ev: T) => void): Promise<void> {
+  const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
   for (;;) {
@@ -277,7 +383,7 @@ export async function runWorkflowStream(
         const trimmed = line.startsWith('data:') ? line.slice(5).trim() : '';
         if (trimmed) {
           try {
-            onEvent(JSON.parse(trimmed) as RunEvent);
+            onEvent(JSON.parse(trimmed) as T);
           } catch {
             /* ignore keep-alives / malformed frames */
           }

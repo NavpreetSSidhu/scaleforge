@@ -165,6 +165,49 @@ export interface ChaosResult {
   nodeImpacts: NodeImpact[];
 }
 
+/** One station's state in a live discrete-event tick. */
+export interface LiveStation {
+  nodeId: string;
+  nodeType: string;
+  label: string;
+  queueLen: number;
+  /** 0..1 fraction of busy servers. */
+  utilization: number;
+  arrived: number;
+  served: number;
+  dropped: number;
+  /** Circuit breaker open — this tier is failing fast to protect a sick downstream. */
+  tripped: boolean;
+}
+
+/** A snapshot streamed from the live discrete-event simulator (one per tick). */
+export interface LiveTick {
+  timeMs: number;
+  stations: LiveStation[];
+  incomingRps: number;
+  servedRps: number;
+  droppedRps: number;
+  p50: number;
+  p95: number;
+  p99: number;
+  p999: number;
+  meanLatencyMs: number;
+  completed: number;
+  failed: number;
+  done: boolean;
+}
+
+/** Body of POST /simulate/live. Zero-valued tuning fields fall back to server defaults. */
+export interface LiveSimRequest {
+  graph: Graph;
+  traffic: TrafficProfile;
+  durationSec?: number;
+  speedFactor?: number;
+  arrivalScale?: number;
+  maxRetries?: number;
+  seed?: number;
+}
+
 export interface SimulateRequest {
   architectureId?: string;
   name?: string;
@@ -257,6 +300,139 @@ export interface AssistantAction {
 export interface AssistantResponse {
   reply: string;
   actions: AssistantAction[];
+}
+
+/** A periodic snapshot during a sandbox load run. */
+export interface SandboxProgress {
+  elapsedSec: number;
+  achievedRps: number;
+  p50: number;
+  p95: number;
+  p99: number;
+  errorRate: number;
+  sent: number;
+  ok: number;
+  failed: number;
+}
+
+/** The final measured outcome of a sandbox load run. */
+export interface SandboxMeasured {
+  achievedRps: number;
+  p50: number;
+  p95: number;
+  p99: number;
+  maxLatencyMs: number;
+  errorRate: number;
+  sent: number;
+  ok: number;
+  failed: number;
+}
+
+export interface SandboxModel {
+  capacityRps: number;
+  serviceLatency: number;
+  concurrency: number;
+}
+
+export interface SandboxPredicted {
+  capacityRps: number;
+  latencyMs: number;
+}
+
+export interface SandboxEvent {
+  type: 'phase' | 'progress' | 'done' | 'error';
+  message?: string;
+  model?: SandboxModel;
+  progress?: SandboxProgress;
+  measured?: SandboxMeasured;
+  predicted?: SandboxPredicted;
+}
+
+export interface SandboxRequest {
+  graph: Graph;
+  traffic: TrafficProfile;
+  predicted: SandboxPredicted;
+  durationSec?: number;
+}
+
+/** One curated system-design interview prompt. */
+export interface InterviewTopic {
+  id: string;
+  title: string;
+  prompt: string;
+  constraints: string[];
+}
+
+export interface InterviewMessage {
+  role: 'user' | 'interviewer';
+  content: string;
+}
+
+export interface InterviewStartResponse {
+  sessionId: string;
+  topic: InterviewTopic;
+}
+
+export interface InterviewTurnRequest {
+  sessionId: string;
+  topic: InterviewTopic;
+  graph: Graph;
+  traffic: TrafficProfile;
+  result?: SimulationResult | null;
+  history: InterviewMessage[];
+  message: string;
+}
+
+export interface InterviewTurnResponse {
+  reply: string;
+  followUps: string[];
+  done: boolean;
+}
+
+export interface InterviewGradeRequest {
+  sessionId: string;
+  topic: InterviewTopic;
+  graph: Graph;
+  traffic: TrafficProfile;
+  result?: SimulationResult | null;
+  history: InterviewMessage[];
+}
+
+export interface RubricScore {
+  dimension: string;
+  score: number;
+  comment: string;
+}
+
+export interface InterviewGradeResponse {
+  summary: string;
+  overall: number;
+  rubric: RubricScore[];
+}
+
+export type ReviewSeverity = 'critical' | 'high' | 'medium' | 'low';
+
+/** One issue raised by the AI SRE reviewer, with a concrete one-click fix. */
+export interface ReviewFinding {
+  severity: ReviewSeverity;
+  category: string;
+  title: string;
+  detail: string;
+  /** Reuses the assistant action shape so the same apply pipeline works. */
+  actions: AssistantAction[];
+}
+
+export interface ReviewResponse {
+  summary: string;
+  findings: ReviewFinding[];
+}
+
+export interface ReviewRequest {
+  graph: Graph;
+  traffic: TrafficProfile;
+  provider?: string;
+  result?: SimulationResult | null;
+  chaos?: ChaosResult | null;
 }
 
 /** One turn of assistant conversation sent back as context. */

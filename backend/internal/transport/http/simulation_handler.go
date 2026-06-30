@@ -1,6 +1,7 @@
 package http
 
 import (
+	"io"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -8,6 +9,7 @@ import (
 	"github.com/scaleforge/scaleforge/internal/catalog"
 	"github.com/scaleforge/scaleforge/internal/middleware"
 	"github.com/scaleforge/scaleforge/internal/simulation"
+	"github.com/scaleforge/scaleforge/internal/simulation/livesim"
 )
 
 type SimulationHandler struct {
@@ -87,6 +89,75 @@ func (h *SimulationHandler) Chaos(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, h.service.Chaos(req))
+}
+
+// liveSimulateRequest is the body of POST /simulate/live. It mirrors a simulate
+// request and adds the knobs the discrete-event run exposes to the UI; zero
+// values fall back to livesim's defaults.
+type liveSimulateRequest struct {
+	Graph        simulation.Graph          `json:"graph"`
+	Traffic      simulation.TrafficProfile `json:"traffic"`
+	DurationSec  float64                   `json:"durationSec,omitempty"`
+	SpeedFactor  float64                   `json:"speedFactor,omitempty"`
+	ArrivalScale float64                   `json:"arrivalScale,omitempty"`
+	MaxRetries   *int                      `json:"maxRetries,omitempty"`
+	Seed         int64                     `json:"seed,omitempty"`
+}
+
+// LiveSimulate runs the discrete-event simulator and streams one Server-Sent
+// Event per tick, so the canvas can animate queues building, tails stretching,
+// and load shedding in real time. Guest-friendly and pure (no LLM, no DB); it
+// shares the sim rate limit applied at the route. Mirrors the Agent Studio Run
+// streaming pattern. A default SpeedFactor paces the run to wall-clock time so
+// the build-up plays out rather than completing instantly.
+func (h *SimulationHandler) LiveSimulate(c *gin.Context) {
+	var req liveSimulateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	opts := livesim.Options{
+		DurationSec:  req.DurationSec,
+		SpeedFactor:  req.SpeedFactor,
+		ArrivalScale: req.ArrivalScale,
+		Seed:         req.Seed,
+	}
+	// Pace to wall-clock by default so the animation is watchable; the client may
+	// override with a higher SpeedFactor (or 0 for as-fast-as-possible).
+	if req.SpeedFactor == 0 {
+		opts.SpeedFactor = 4
+	}
+	if req.MaxRetries != nil {
+		opts.MaxRetries = *req.MaxRetries
+	}
+
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
+
+	ctx := c.Request.Context()
+	ticks := make(chan livesim.Tick, 64)
+	go func() {
+		defer close(ticks)
+		livesim.Run(ctx, req.Graph, req.Traffic, h.catalog.Map(), opts, func(t livesim.Tick) {
+			// Don't block forever pushing ticks if the client has disconnected.
+			select {
+			case ticks <- t:
+			case <-ctx.Done():
+			}
+		})
+	}()
+
+	c.Stream(func(w io.Writer) bool {
+		t, ok := <-ticks
+		if !ok {
+			return false
+		}
+		c.SSEvent("message", t)
+		return true
+	})
 }
 
 func (h *SimulationHandler) Get(c *gin.Context) {

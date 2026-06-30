@@ -344,6 +344,21 @@ func headroomLabel(capacity, incomingRPS float64) string {
 	return fmt.Sprintf("%.0f×", capacity/incomingRPS)
 }
 
+// ServiceCapacity returns a node's sustained request capacity (rps), identical to
+// the steady-state engine's per-node capacity (replicas × per-instance × cpu ×
+// runtime factor). Exposed so the live discrete-event simulator derives station
+// service rates from the exact same numbers the estimator uses.
+func ServiceCapacity(node Node, defs map[string]catalog.NodeDefinition) float64 {
+	return nodeCapacityFor(node, defs)
+}
+
+// TopologicalOrder returns the graph's nodes in dependency order (roots first),
+// the same ordering the latency/capacity passes walk. Exposed so the live
+// simulator can route requests through the tiers in dependency order.
+func TopologicalOrder(graph Graph) []Node {
+	return orderedNodes(graph)
+}
+
 func runEngine(graph Graph, traffic TrafficProfile, defs map[string]catalog.NodeDefinition) Result {
 	incomingRPS := CalculateIncomingRPS(traffic)
 	latency := calculateLatency(graph, defs)

@@ -14,11 +14,14 @@ import (
 	"github.com/scaleforge/scaleforge/internal/config"
 	"github.com/scaleforge/scaleforge/internal/cost"
 	"github.com/scaleforge/scaleforge/internal/course"
+	"github.com/scaleforge/scaleforge/internal/interview"
 	"github.com/scaleforge/scaleforge/internal/middleware"
 	"github.com/scaleforge/scaleforge/internal/pricing"
 	"github.com/scaleforge/scaleforge/internal/repository"
 	"github.com/scaleforge/scaleforge/internal/repository/postgres"
+	"github.com/scaleforge/scaleforge/internal/review"
 	runtimepkg "github.com/scaleforge/scaleforge/internal/runtime"
+	"github.com/scaleforge/scaleforge/internal/sandbox"
 	"github.com/scaleforge/scaleforge/internal/scoring"
 	"github.com/scaleforge/scaleforge/internal/simulation"
 	"github.com/scaleforge/scaleforge/internal/tutor"
@@ -59,6 +62,18 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 	}
 	assistService := assist.NewService(assistProvider, catalogService)
 
+	// The SRE reviewer reuses the same LLM provider and catalog; it grounds its
+	// findings in the measured simulation + chaos results passed by the client.
+	reviewService := review.NewService(assistProvider, catalogService)
+
+	// The interviewer reuses the same provider + catalog. Start (topic + prompt)
+	// is static, so it works without a key; only the AI turns + grading gate.
+	interviewService := interview.NewService(assistProvider, catalogService)
+
+	// The Real Sandbox stands the design up as a live HTTP service and load-tests
+	// it. Opt-in via SANDBOX_ENABLED since it spawns a server and drives traffic.
+	sandboxService := sandbox.NewService(cfg.SandboxEnabled, catalogService)
+
 	// The tutor reuses the same LLM provider; lesson content is authored client-
 	// side, so this only powers the Teacher/Q&A personas + progress persistence.
 	var tutorProvider tutor.Provider
@@ -93,6 +108,9 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 	pricingHandler := NewPricingHandler(pricingCatalog)
 	runtimeHandler := NewRuntimeHandler(runtimepkg.NewCatalog())
 	assistHandler := NewAssistHandler(assistService)
+	reviewHandler := NewReviewHandler(reviewService)
+	interviewHandler := NewInterviewHandler(interviewService)
+	sandboxHandler := NewSandboxHandler(sandboxService)
 	tutorHandler := NewTutorHandler(tutorService)
 	courseHandler := NewCourseHandler(courseService)
 	agentflowHandler := NewAgentflowHandler(agentflowService, agentExecutor)
@@ -119,10 +137,28 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 		guest.GET("/pricing", pricingHandler.List)
 		guest.GET("/runtimes", runtimeHandler.List)
 		guest.POST("/simulate", simLimiter.Middleware(), simHandler.Simulate)
+		guest.POST("/simulate/live", simLimiter.Middleware(), simHandler.LiveSimulate)
 		guest.POST("/compare", simLimiter.Middleware(), simHandler.Compare)
 		guest.POST("/chaos", simLimiter.Middleware(), simHandler.Chaos)
 		guest.GET("/assistant", assistHandler.Status)
 		guest.POST("/assistant", assistHandler.Chat)
+
+		// AI SRE reviewer: a structured audit grounded in the measured sim + chaos
+		// results. Guest-friendly, key-gated and rate-limited inside the handler.
+		guest.GET("/review", reviewHandler.Status)
+		guest.POST("/review", reviewHandler.Review)
+
+		// AI System Design Interviewer: Start is static (topic bank); Turn/Grade are
+		// key-gated AI turns. Guest-friendly, rate-limited inside the handler.
+		guest.GET("/interview", interviewHandler.Status)
+		guest.POST("/interview/start", interviewHandler.Start)
+		guest.POST("/interview/turn", interviewHandler.Turn)
+		guest.POST("/interview/grade", interviewHandler.Grade)
+
+		// Real Sandbox: stand the design up live and load-test it. Gated by
+		// SANDBOX_ENABLED + tightly rate-limited inside the handler.
+		guest.GET("/sandbox", sandboxHandler.Status)
+		guest.POST("/sandbox/run", sandboxHandler.Run)
 
 		// Learn module: authored lessons render client-side; these power the two
 		// AI personas (gated by API key, rate-limited inside the handler).

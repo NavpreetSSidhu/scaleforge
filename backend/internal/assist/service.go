@@ -68,11 +68,18 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (Response, error) {
 
 // validateActions drops any action that references an unknown component type or a
 // node id that doesn't exist, so the client never receives an action it can't
-// safely apply. addNode actions may declare a proposed id that later edges in the
-// same batch reference; those proposed ids count as valid endpoints.
+// safely apply.
 func (s *Service) validateActions(actions []Action, graph simulation.Graph) []Action {
-	defs := s.catalog.Map()
+	return ValidateActions(actions, graph, s.catalog.Map())
+}
 
+// ValidateActions drops any action that references an unknown component type or a
+// node id that doesn't exist, so the client never receives an action it can't
+// safely apply. addNode actions may declare a proposed id that later edges in the
+// same batch reference; those proposed ids count as valid endpoints. Exported so
+// other catalog-grounded LLM features (e.g. the SRE reviewer) can reuse the same
+// guard over assist.Action without re-implementing it.
+func ValidateActions(actions []Action, graph simulation.Graph, defs map[string]catalog.NodeDefinition) []Action {
 	validIDs := make(map[string]bool, len(graph.Nodes))
 	for _, n := range graph.Nodes {
 		validIDs[n.ID] = true
@@ -177,6 +184,13 @@ func (s *Service) userPrompt(req ChatRequest) string {
 	b.WriteString("\n\nUser request: ")
 	b.WriteString(req.Message)
 	return b.String()
+}
+
+// ExtractJSONObject returns the substring spanning the first '{' to the last '}',
+// a cheap salvage for models that wrap JSON in stray prose. Exported so other
+// LLM features can reuse the same salvage.
+func ExtractJSONObject(s string) string {
+	return extractJSONObject(s)
 }
 
 // extractJSONObject returns the substring spanning the first '{' to the last '}',

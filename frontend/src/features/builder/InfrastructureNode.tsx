@@ -10,6 +10,8 @@ export type InfrastructureNodeData = GraphNode & {
   healthStatus?: NodeHealth['status'];
   /** 0..1+ load ratio (incoming / capacity); drives a graduated glow. */
   utilization?: number;
+  /** Requests waiting in this station's queue (Live Mode); shown as a badge. */
+  queueDepth?: number;
   /** Killed in Chaos mode (or inside a downed region) — rendered offline. */
   dead?: boolean;
 };
@@ -93,6 +95,16 @@ function InfrastructureNodeComponent({ data, selected }: NodeProps<Infrastructur
           )
         )}
       </div>
+
+      {/* Live Mode queue-depth badge — requests waiting at this station. */}
+      {!dead && data.queueDepth != null && data.queueDepth > 0 && (
+        <span
+          className="absolute -right-2 -top-2 flex min-w-[1.25rem] items-center justify-center rounded-full border border-amber/50 bg-base px-1 py-0.5 font-mono text-[10px] font-semibold text-amber"
+          title={`${data.queueDepth} requests queued`}
+        >
+          {data.queueDepth > 999 ? '999+' : data.queueDepth}
+        </span>
+      )}
 
       {/* category accent bar */}
       <span

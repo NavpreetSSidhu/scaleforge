@@ -12,9 +12,11 @@ import { CompareView } from '@/features/compare/CompareView';
 import { MobileView } from '@/features/mobile/MobileView';
 import { LearnView } from '@/features/learn/LearnView';
 import { StudioView } from '@/features/studio/StudioView';
+import { InterviewView } from '@/features/interview/InterviewView';
 import { useStudioRun } from '@/features/studio/useStudioRun';
 import { useStudioStore } from '@/store/studioStore';
 import { ReportDrawer } from '@/features/report/ReportDrawer';
+import { ReviewDrawer } from '@/features/review/ReviewDrawer';
 import { AssistantDrawer } from '@/features/assistant/AssistantDrawer';
 import { StudioAssistantDrawer } from '@/features/studio/StudioAssistantDrawer';
 import { TutorDrawer } from '@/features/learn/TutorDrawer';
@@ -182,9 +184,11 @@ export default function App() {
       {view === 'compare' && <CompareView />}
       {view === 'mobile' && <MobileView onRun={runSimulation} isRunning={simulate.isPending} />}
       {view === 'learn' && <LearnView />}
+      {view === 'interview' && <InterviewView />}
       {view === 'studio' && <StudioView />}
 
       <ReportDrawer />
+      <ReviewDrawer onRun={runSimulation} />
       <AssistantDrawer onRun={runSimulation} />
       <StudioAssistantDrawer />
       <TutorDrawer />

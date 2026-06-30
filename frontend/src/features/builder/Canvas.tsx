@@ -18,6 +18,7 @@ import { api } from '@/lib/api';
 import { categoryStyle } from '@/lib/catalog';
 import { useArchitectureStore } from '@/store/architectureStore';
 import { useChaosStore } from '@/store/chaosStore';
+import { useLiveSimStore } from '@/store/liveSimStore';
 import { regionAccent, regionOf } from '@/lib/regions';
 import type { GraphNode } from '@/types/domain';
 import InfrastructureNode, { type InfrastructureNodeData } from './InfrastructureNode';
@@ -82,6 +83,8 @@ export function Canvas() {
   const { screenToFlowPosition } = useReactFlow();
 
   const { mode: chaosMode, result: chaosResult, toggleKill } = useChaosStore();
+  const liveMode = useLiveSimStore((s) => s.mode);
+  const liveTick = useLiveSimStore((s) => s.latest);
 
   const { data: catalog } = useQuery({
     queryKey: ['catalog'],
@@ -98,8 +101,28 @@ export function Canvas() {
   // comes from the degraded chaos result; otherwise from the normal simulation.
   // Computed once here and read by both the node sync and the edge memo.
   const nodeView = useMemo(() => {
-    type View = { status: InfrastructureNodeData['healthStatus']; utilization?: number; dead?: boolean };
+    type View = {
+      status: InfrastructureNodeData['healthStatus'];
+      utilization?: number;
+      dead?: boolean;
+      queueDepth?: number;
+    };
     const map = new Map<string, View>();
+
+    // Live Mode wins when active: derive each node's state from the latest
+    // streamed discrete-event tick (queue depth + busy-server utilization).
+    if (liveMode && liveTick) {
+      for (const st of liveTick.stations) {
+        const status: View['status'] =
+          st.tripped || st.utilization >= 1
+            ? 'bottleneck'
+            : st.utilization >= 0.75
+              ? 'warning'
+              : 'healthy';
+        map.set(st.nodeId, { status, utilization: st.utilization, queueDepth: st.queueLen });
+      }
+      return map;
+    }
 
     if (chaosMode && chaosResult) {
       const incoming = chaosResult.degraded.incomingRps;
@@ -132,7 +155,7 @@ export function Canvas() {
       );
     }
     return map;
-  }, [chaosMode, chaosResult, simulationResult]);
+  }, [liveMode, liveTick, chaosMode, chaosResult, simulationResult]);
 
   // React Flow owns node view-state (incl. measured dimensions); the store is the
   // source of truth for structure/config. We sync store -> view here.
@@ -148,7 +171,7 @@ export function Canvas() {
           const v = nodeView.get(n.id);
           return `${n.id}@${n.position.x},${n.position.y}:${n.label}:${n.config.cpu}/${n.config.replicas}:${
             v?.status ?? ''
-          }:${v?.utilization?.toFixed(2) ?? ''}:${v?.dead ? 'x' : ''}:${
+          }:${v?.utilization?.toFixed(2) ?? ''}:${v?.queueDepth ?? ''}:${v?.dead ? 'x' : ''}:${
             categoryByType.get(n.type) ?? ''
           }:${regionOf(n.config.region)}`;
         })
@@ -174,6 +197,7 @@ export function Canvas() {
             category: categoryByType.get(sn.type) ?? 'compute',
             healthStatus: nodeView.get(sn.id)?.status,
             utilization: nodeView.get(sn.id)?.utilization,
+            queueDepth: nodeView.get(sn.id)?.queueDepth,
             dead: nodeView.get(sn.id)?.dead,
           },
         };
@@ -184,7 +208,7 @@ export function Canvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syncSig]);
 
-  const active = chaosMode ? !!chaosResult : !!simulationResult;
+  const active = liveMode ? !!liveTick : chaosMode ? !!chaosResult : !!simulationResult;
   const flowEdges: Edge<TrafficEdgeData>[] = useMemo(
     () =>
       storeEdges.map((edge) => {

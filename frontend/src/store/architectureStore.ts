@@ -11,7 +11,7 @@ import type {
 import { demoGraph, demoTraffic } from '@/data/demoScenario';
 
 export type ScoreView = 'cards' | 'gauges' | 'radar';
-export type AppView = 'dashboard' | 'builder' | 'mobile' | 'compare' | 'learn' | 'studio';
+export type AppView = 'dashboard' | 'builder' | 'mobile' | 'compare' | 'learn' | 'studio' | 'interview';
 
 export const DEFAULT_REGION = 'us-east-1';
 export const DEFAULT_PROVIDER = 'aws';
