@@ -146,9 +146,9 @@ export function TopBar({ onRun, isRunning, onSave, isSaving }: TopBarProps) {
         <span className="text-[15px] font-bold tracking-tight">ScaleForge</span>
       </div>
 
-      {/* Nav tabs — flexes and scrolls so the action cluster on the right is never
-          pushed off-screen on narrower viewports. */}
-      <nav className="ml-2 hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto md:flex [&::-webkit-scrollbar]:hidden">
+      {/* Nav tabs — sized to content (no scroll container) so the hover tooltips
+          aren't clipped; the action cluster floats right via its own ml-auto. */}
+      <nav className="ml-2 hidden shrink-0 items-center gap-1 md:flex">
         {tabs.map((t) => (
           <Tab
             key={t.id}
@@ -338,20 +338,23 @@ function Tab({
   onClick?: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm transition xl:px-3 ${
-        active
-          ? 'bg-surface-panel text-ink shadow-sm ring-1 ring-white/[0.06]'
-          : 'text-ink-faint hover:text-ink-muted'
-      }`}
-    >
-      {icon}
-      <span className="hidden 2xl:inline">{label}</span>
-    </button>
+    // The label collapses to an icon on narrower viewports; the styled tooltip
+    // surfaces it on hover/focus so the tab is never an unlabeled glyph.
+    <Tooltip label={label} className="shrink-0">
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={label}
+        className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm transition xl:px-3 ${
+          active
+            ? 'bg-surface-panel text-ink shadow-sm ring-1 ring-white/[0.06]'
+            : 'text-ink-faint hover:text-ink-muted'
+        }`}
+      >
+        {icon}
+        <span className="hidden 2xl:inline">{label}</span>
+      </button>
+    </Tooltip>
   );
 }
 
