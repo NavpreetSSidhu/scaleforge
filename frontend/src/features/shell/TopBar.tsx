@@ -144,11 +144,11 @@ export function TopBar({ onRun, isRunning, onSave, isSaving }: TopBarProps) {
       <div className="flex shrink-0 items-center gap-2">
         <LogoMark />
         <span className="text-[15px] font-bold tracking-tight">ScaleForge</span>
-        <span className="chip hidden bg-accent/15 text-accent sm:inline-block">Beta</span>
       </div>
 
-      {/* Nav tabs */}
-      <nav className="ml-2 hidden shrink-0 items-center gap-1 md:flex">
+      {/* Nav tabs — flexes and scrolls so the action cluster on the right is never
+          pushed off-screen on narrower viewports. */}
+      <nav className="ml-2 hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto md:flex [&::-webkit-scrollbar]:hidden">
         {tabs.map((t) => (
           <Tab
             key={t.id}
@@ -284,10 +284,12 @@ export function TopBar({ onRun, isRunning, onSave, isSaving }: TopBarProps) {
         <Tooltip label={inStudio ? 'Run agent workflow live (⌘⏎)' : 'Run load simulation (⌘⏎)'}>
           <button type="button" onClick={onRun} disabled={isRunning} className="btn-primary">
             {isRunning ? <Spinner className="h-4 w-4" /> : <Play className="h-4 w-4" fill="currentColor" />}
-            <span className="hidden sm:inline">
+            {/* Compact label on mid widths, full label only when there's room. */}
+            <span className="hidden sm:inline xl:hidden">{isRunning ? 'Running…' : 'Run'}</span>
+            <span className="hidden xl:inline">
               {isRunning ? 'Running…' : inStudio ? 'Run Agent' : 'Run Simulation'}
             </span>
-            <span className="ml-0.5 hidden rounded bg-black/20 px-1 font-mono text-[10px] lg:inline">⌘⏎</span>
+            <span className="ml-0.5 hidden rounded bg-black/20 px-1 font-mono text-[10px] 2xl:inline">⌘⏎</span>
           </button>
         </Tooltip>
 
@@ -348,7 +350,7 @@ function Tab({
       }`}
     >
       {icon}
-      <span className="hidden xl:inline">{label}</span>
+      <span className="hidden 2xl:inline">{label}</span>
     </button>
   );
 }
