@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   backend:
@@ -59,3 +60,45 @@ jobs:
 
       - name: Build
         run: bun run build
+
+  labs:
+    name: Labs (real containers)
+    runs-on: ubuntu-latest
+    # Provisions real containers, so it is slower and heavier than the unit jobs.
+    # It is the only thing that proves the lab environments actually work.
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: backend/go.sum
+
+      - name: Check Docker is available
+        run: docker version
+
+      # Pulled up front so an image or registry problem fails here with a clear
+      # message, rather than inside a lab's provisioning timeout.
+      - name: Pull lab images
+        run: |
+          docker pull minio/minio:latest
+          docker pull amazon/aws-cli:latest
+          docker pull rancher/k3s:latest
+          docker pull postgres:16-alpine
+          docker pull redis:7-alpine
+
+      # -parallel 1 runs the labs one at a time: a hosted runner does not have the
+      # memory to stand up k3s, Postgres, MinIO and Redis simultaneously.
+      - name: Lab integration tests
+        run: LAB_DOCKER_TEST=1 go test ./internal/lab/ -run TestLabsEndToEnd -v -parallel 1 -timeout 25m
+
+      - name: Report leftover lab resources
+        if: always()
+        run: |
+          echo "Containers:"; docker ps -a --filter "label=scaleforge.lab=1" --format '{{.Names}} {{.Status}}'
+          echo "Networks:";   docker network ls --filter "label=scaleforge.lab=1" --format '{{.Name}}'
