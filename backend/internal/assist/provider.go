@@ -31,8 +31,16 @@ type GroqProvider struct {
 // GroqBaseURL is Groq's OpenAI-compatible endpoint root.
 const GroqBaseURL = "https://api.groq.com/openai/v1"
 
-// DefaultModel is a capable, free-tier Groq model with JSON-mode support.
-const DefaultModel = "llama-3.3-70b-versatile"
+// DefaultModel is a capable Groq model with JSON-mode support.
+//
+// Groq retires models on a rolling basis, and a retired default breaks every AI
+// feature at once with a 404. When that happens, override it with ASSIST_MODEL
+// rather than waiting on a release: `curl https://api.groq.com/openai/v1/models`
+// with your key lists what your account can actually reach.
+//
+// (The previous default, llama-3.3-70b-versatile, was retired and did exactly
+// that — hence the explicit unavailable-model error below.)
+const DefaultModel = "openai/gpt-oss-120b"
 
 // NewGroqProvider builds a Groq-backed provider. An empty model falls back to
 // DefaultModel.
@@ -120,7 +128,7 @@ func (p *GroqProvider) complete(ctx context.Context, systemPrompt, userPrompt st
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("assistant provider returned %d: %s", resp.StatusCode, string(raw))
+		return "", p.describeHTTPError(resp.StatusCode, raw)
 	}
 
 	var parsed chatResponseBody
@@ -134,4 +142,36 @@ func (p *GroqProvider) complete(ctx context.Context, systemPrompt, userPrompt st
 		return "", fmt.Errorf("assistant returned no choices")
 	}
 	return parsed.Choices[0].Message.Content, nil
+}
+
+// describeHTTPError turns a provider error into something a developer can act on.
+//
+// The failures worth naming are the ones that look like an outage but are really
+// configuration: a retired or unreachable model, and a bad key. Both otherwise
+// surface as a raw JSON blob behind a 502, which reads like the feature is broken
+// rather than like a setting needs changing.
+func (p *GroqProvider) describeHTTPError(status int, raw []byte) error {
+	var body struct {
+		Error struct {
+			Message string `json:"message"`
+			Code    string `json:"code"`
+		} `json:"error"`
+	}
+	_ = json.Unmarshal(raw, &body)
+
+	switch {
+	case body.Error.Code == "model_not_found" || status == http.StatusNotFound:
+		return fmt.Errorf(
+			"the configured model %q is not available on this account — set ASSIST_MODEL to one that is "+
+				"(list them with: curl -H \"Authorization: Bearer $GROQ_API_KEY\" %s/models)",
+			p.model, p.baseURL)
+	case status == http.StatusUnauthorized:
+		return fmt.Errorf("the LLM provider rejected the API key — check GROQ_API_KEY")
+	case status == http.StatusTooManyRequests:
+		return fmt.Errorf("the LLM provider is rate limiting — try again shortly")
+	case body.Error.Message != "":
+		return fmt.Errorf("assistant provider returned %d: %s", status, body.Error.Message)
+	default:
+		return fmt.Errorf("assistant provider returned %d: %s", status, string(raw))
+	}
 }

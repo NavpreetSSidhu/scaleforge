@@ -52,6 +52,7 @@ const emulatorNote = "Runs against the floci AWS emulator, not AWS. The API and 
 func dynamoLab() Lab {
 	return Lab{
 		ID:           "dynamodb-modeling",
+		Toolchain:    "AWS CLI v2 (`aws`) pointed at the floci emulator; AWS_ENDPOINT_URL and credentials are preset. Busybox shell.",
 		Title:        "DynamoDB: Keys, Indexes & Conditional Writes",
 		Track:        TrackCloudAPI,
 		Difficulty:   Intermediate,
@@ -128,6 +129,7 @@ func dynamoLab() Lab {
 func queueLab() Lab {
 	return Lab{
 		ID:           "sqs-sns-messaging",
+		Toolchain:    "AWS CLI v2 (`aws`) pointed at the floci emulator; AWS_ENDPOINT_URL and credentials are preset. Queue URLs come back as http://floci:4566/... and are reachable from here.",
 		Title:        "SQS & SNS: Retries, Dead Letters & Fan-out",
 		Track:        TrackCloudAPI,
 		Difficulty:   Beginner,

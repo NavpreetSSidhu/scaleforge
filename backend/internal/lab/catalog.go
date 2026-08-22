@@ -93,9 +93,13 @@ type Lab struct {
 	Fidelity string `json:"fidelity"`
 	// FidelityNote explains, for an emulated lab, what the emulator is and is not
 	// faithful to. Required when Fidelity is FidelityEmulated.
-	FidelityNote string      `json:"fidelityNote,omitempty"`
-	Services     []Service   `json:"services"`
-	Workstation  Workstation `json:"-"`
+	FidelityNote string `json:"fidelityNote,omitempty"`
+	// Toolchain describes, in one sentence, what is on the workstation's PATH and
+	// how it is already configured. The UI shows it, and the AI assistant needs it
+	// to propose commands that will actually run in *this* environment.
+	Toolchain   string      `json:"toolchain"`
+	Services    []Service   `json:"services"`
+	Workstation Workstation `json:"-"`
 	// Ready is polled in the workstation until it exits 0 — the signal that every
 	// service is actually serving, not merely that the container started.
 	Ready string `json:"-"`

@@ -30,6 +30,8 @@ export interface Lab {
   difficulty: LabDifficulty;
   minutes: number;
   concepts: string[];
+  /** What's on the workstation's PATH and how it's already configured. */
+  toolchain: string;
   fidelity: LabFidelity;
   /** For an emulated lab, what the emulator is and isn't faithful to. */
   fidelityNote?: string;
@@ -43,7 +45,33 @@ export interface LabStatus {
   enabled: boolean;
   /** Whether a Docker daemon is reachable right now. */
   docker: boolean;
+  /** Whether an LLM provider is configured. Labs work fully without one. */
+  assistant: boolean;
   labs: Lab[];
+}
+
+/** One command the assistant proposes. Nothing runs until the user accepts it. */
+export interface LabCommand {
+  run: string;
+  explain?: string;
+}
+
+export interface LabAssistRequest {
+  message: string;
+  /** Tail of the user's terminal, so errors can be answered against the real output. */
+  terminal?: string;
+  history?: { role: 'user' | 'assistant'; content: string }[];
+}
+
+export interface LabAssistResponse {
+  reply: string;
+  commands: LabCommand[];
+}
+
+export interface LabRunResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
 }
 
 export type LabSessionStatus = 'starting' | 'ready' | 'failed' | 'stopped';

@@ -20,7 +20,7 @@ import { useSnackbar } from '@/store/snackbarStore';
 import type { Course } from '@/types/domain';
 import { useTutorEnabled } from './TutorDrawer';
 import { LessonStage } from './LessonStage';
-import { Markdown } from './Markdown';
+import { Markdown } from '@/components/Markdown';
 
 export function LessonPlayer({ course }: { course: Course }) {
   const { stepIndex, setStep, closeCourse, openDrawer } = useLearnStore();

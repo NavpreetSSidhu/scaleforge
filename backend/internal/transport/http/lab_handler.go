@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/scaleforge/scaleforge/internal/lab"
+	"github.com/scaleforge/scaleforge/internal/labassist"
 	"github.com/scaleforge/scaleforge/internal/middleware"
 )
 
@@ -18,15 +19,22 @@ import (
 // Starting a lab pulls images and holds real memory, so it is gated behind
 // LABS_ENABLED and rate-limited well below the other endpoints.
 type LabHandler struct {
-	manager  *lab.Manager
-	limiter  *middleware.IPRateLimiter
-	upgrader websocket.Upgrader
+	manager *lab.Manager
+	assist  *labassist.Service
+	limiter *middleware.IPRateLimiter
+	// assistLimiter is separate and tighter: an assistant turn costs an LLM call,
+	// while starting a lab costs containers. They are throttled for different
+	// reasons and shouldn't consume each other's budget.
+	assistLimiter *middleware.IPRateLimiter
+	upgrader      websocket.Upgrader
 }
 
-func NewLabHandler(manager *lab.Manager, allowedOrigin string) *LabHandler {
+func NewLabHandler(manager *lab.Manager, assist *labassist.Service, allowedOrigin string) *LabHandler {
 	return &LabHandler{
-		manager: manager,
-		limiter: middleware.NewIPRateLimiter(10, time.Minute),
+		manager:       manager,
+		assist:        assist,
+		limiter:       middleware.NewIPRateLimiter(10, time.Minute),
+		assistLimiter: middleware.NewIPRateLimiter(20, time.Minute),
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  4096,
 			WriteBufferSize: 4096,
@@ -57,7 +65,10 @@ func (h *LabHandler) Status(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"enabled": enabled,
 		"docker":  h.manager.DockerReady(c.Request.Context()),
-		"labs":    h.manager.Catalog().List(),
+		// Reported separately: labs work fine without an LLM key, the assistant
+		// entry point is simply hidden.
+		"assistant": h.assist.Enabled(),
+		"labs":      h.manager.Catalog().List(),
 	})
 }
 
@@ -133,6 +144,68 @@ func (h *LabHandler) Hint(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"hint": hint})
+}
+
+type runCommandRequest struct {
+	Command string `json:"command" binding:"required,max=4000"`
+}
+
+// RunCommand executes a single command in the session's workstation.
+//
+// It is the execution half of the assistant: the user reviews a proposed command
+// and accepts it, and this runs it with the output captured. It grants nothing
+// the lab terminal doesn't already — that is an interactive shell in the same
+// container — so it is gated identically and never invoked without an explicit
+// user action in the UI.
+func (h *LabHandler) RunCommand(c *gin.Context) {
+	if !h.limiter.Allow(c.ClientIP()) {
+		c.JSON(http.StatusTooManyRequests, ErrorResponse{Error: "rate limit reached — please wait a moment"})
+		return
+	}
+	var req runCommandRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	result, err := h.manager.RunCommand(c.Request.Context(), c.Param("id"), req.Command)
+	if err != nil {
+		c.JSON(http.StatusUnprocessableEntity, ErrorResponse{Error: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
+// Assist answers a question about the running lab and may propose commands.
+func (h *LabHandler) Assist(c *gin.Context) {
+	if !h.assist.Enabled() {
+		c.JSON(http.StatusServiceUnavailable, ErrorResponse{Error: "lab assistant not configured"})
+		return
+	}
+	if !h.assistLimiter.Allow(c.ClientIP()) {
+		c.JSON(http.StatusTooManyRequests, ErrorResponse{Error: "rate limit reached — please wait a moment"})
+		return
+	}
+
+	var req labassist.ChatRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	resp, err := h.assist.Chat(c.Request.Context(), c.Param("id"), req)
+	if err != nil {
+		status := http.StatusBadGateway
+		switch err {
+		case labassist.ErrDisabled:
+			status = http.StatusServiceUnavailable
+		case labassist.ErrNoSession:
+			status = http.StatusUnprocessableEntity
+		}
+		c.JSON(status, ErrorResponse{Error: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 // terminalControl is a client control frame, sent as a text message. Keystrokes

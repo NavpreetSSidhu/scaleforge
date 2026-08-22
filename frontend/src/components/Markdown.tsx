@@ -47,7 +47,9 @@ function CodeBlock({ children }: { children?: ReactNode }) {
   );
 }
 
-/** Dark-theme markdown styling shared by lesson bodies and tutor replies. */
+/** Dark-theme markdown styling shared by lesson bodies, tutor replies, and every
+ *  AI chat drawer — LLM replies are markdown, and rendering them raw shows the
+ *  user literal asterisks and backticks. */
 const components: Components = {
   p: ({ children }) => <p className="mb-3 leading-relaxed last:mb-0">{children}</p>,
   strong: ({ children }) => <strong className="font-semibold text-ink">{children}</strong>,
@@ -55,7 +57,28 @@ const components: Components = {
   ul: ({ children }) => <ul className="mb-3 list-disc space-y-1 pl-5 last:mb-0">{children}</ul>,
   ol: ({ children }) => <ol className="mb-3 list-decimal space-y-1 pl-5 last:mb-0">{children}</ol>,
   li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+  // Models pick heading levels inconsistently; they should all read as one style
+  // rather than one of them falling through to the browser default.
+  h1: ({ children }) => <h3 className="mb-2 text-sm font-semibold text-ink">{children}</h3>,
+  h2: ({ children }) => <h3 className="mb-2 text-sm font-semibold text-ink">{children}</h3>,
   h3: ({ children }) => <h3 className="mb-2 text-sm font-semibold text-ink">{children}</h3>,
+  h4: ({ children }) => <h4 className="mb-1.5 text-[13px] font-semibold text-ink">{children}</h4>,
+  hr: () => <hr className="my-3 border-0 border-t border-surface-line" />,
+  blockquote: ({ children }) => (
+    <blockquote className="mb-3 border-l-2 border-surface-line pl-3 text-ink-faint last:mb-0">
+      {children}
+    </blockquote>
+  ),
+  // Wide tables must scroll inside the bubble rather than stretch the drawer.
+  table: ({ children }) => (
+    <div className="mb-3 overflow-x-auto last:mb-0">
+      <table className="w-full border-collapse text-[0.85em]">{children}</table>
+    </div>
+  ),
+  th: ({ children }) => (
+    <th className="border border-surface-line px-2 py-1 text-left font-semibold text-ink">{children}</th>
+  ),
+  td: ({ children }) => <td className="border border-surface-line px-2 py-1">{children}</td>,
   pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
   code: ({ className, children }) => {
     // rehype-highlight tags fenced blocks with `language-*`/`hljs`; inline code has neither.

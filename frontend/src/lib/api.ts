@@ -36,6 +36,9 @@ import type {
 } from '@/types/domain';
 import type {
   Lab,
+  LabAssistRequest,
+  LabAssistResponse,
+  LabRunResult,
   LabSession,
   LabStatus,
   LabVerifyResult,
@@ -173,6 +176,16 @@ export const api = {
     request<LabVerifyResult>(`/labs/sessions/${id}/verify`, { method: 'POST' }),
   getLabHint: (id: string, taskId: string) =>
     request<{ hint: string }>(`/labs/sessions/${id}/hint?task=${encodeURIComponent(taskId)}`),
+  labAssist: (id: string, payload: LabAssistRequest) =>
+    request<LabAssistResponse>(`/labs/sessions/${id}/assist`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  runLabCommand: (id: string, command: string) =>
+    request<LabRunResult>(`/labs/sessions/${id}/run`, {
+      method: 'POST',
+      body: JSON.stringify({ command }),
+    }),
 
   getReviewStatus: () => request<{ enabled: boolean }>('/review'),
 

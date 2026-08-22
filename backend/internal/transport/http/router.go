@@ -16,6 +16,7 @@ import (
 	"github.com/scaleforge/scaleforge/internal/course"
 	"github.com/scaleforge/scaleforge/internal/interview"
 	"github.com/scaleforge/scaleforge/internal/lab"
+	"github.com/scaleforge/scaleforge/internal/labassist"
 	"github.com/scaleforge/scaleforge/internal/middleware"
 	"github.com/scaleforge/scaleforge/internal/pricing"
 	"github.com/scaleforge/scaleforge/internal/repository"
@@ -84,6 +85,14 @@ func NewRouter(cfg *config.Config, deps Dependencies) (*gin.Engine, func()) {
 	// inside it. Opt-in via LABS_ENABLED since it pulls images and holds memory.
 	labManager := lab.NewManager(cfg.LabsEnabled, lab.NewCatalog())
 
+	// The lab assistant reuses the same LLM provider as the other AI features.
+	// Labs work fully without a key; only the assistant entry point is hidden.
+	var labProvider labassist.Provider
+	if assistProvider != nil {
+		labProvider = assistProvider
+	}
+	labAssist := labassist.NewService(labProvider, labManager)
+
 	// The tutor reuses the same LLM provider; lesson content is authored client-
 	// side, so this only powers the Teacher/Q&A personas + progress persistence.
 	var tutorProvider tutor.Provider
@@ -121,7 +130,7 @@ func NewRouter(cfg *config.Config, deps Dependencies) (*gin.Engine, func()) {
 	reviewHandler := NewReviewHandler(reviewService)
 	interviewHandler := NewInterviewHandler(interviewService)
 	sandboxHandler := NewSandboxHandler(sandboxService)
-	labHandler := NewLabHandler(labManager, cfg.CORSOrigin)
+	labHandler := NewLabHandler(labManager, labAssist, cfg.CORSOrigin)
 	tutorHandler := NewTutorHandler(tutorService)
 	courseHandler := NewCourseHandler(courseService)
 	agentflowHandler := NewAgentflowHandler(agentflowService, agentExecutor)
@@ -181,6 +190,8 @@ func NewRouter(cfg *config.Config, deps Dependencies) (*gin.Engine, func()) {
 		guest.POST("/labs/sessions/:id/verify", labHandler.Verify)
 		guest.GET("/labs/sessions/:id/hint", labHandler.Hint)
 		guest.GET("/labs/sessions/:id/terminal", labHandler.Terminal)
+		guest.POST("/labs/sessions/:id/run", labHandler.RunCommand)
+		guest.POST("/labs/sessions/:id/assist", labHandler.Assist)
 
 		// Learn module: authored lessons render client-side; these power the two
 		// AI personas (gated by API key, rate-limited inside the handler).

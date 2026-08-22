@@ -8,6 +8,7 @@ import "github.com/scaleforge/scaleforge/internal/dockerx"
 func s3Lab() Lab {
 	return Lab{
 		ID:         "s3-object-storage",
+		Toolchain:  "AWS CLI v2 (`aws`) pointed at the MinIO container; AWS_ENDPOINT_URL and credentials are preset, so no --endpoint-url flag is needed. Busybox shell.",
 		Title:      "S3: Buckets, Objects & Versioning",
 		Track:      TrackStorage,
 		Difficulty: Beginner,
@@ -118,6 +119,7 @@ func s3Lab() Lab {
 func kubernetesLab() Lab {
 	return Lab{
 		ID:         "kubernetes-workloads",
+		Toolchain:  "`kubectl` inside the k3s server container, already pointed at the cluster's own kubeconfig. Also `crictl`. No `jq` — use kubectl -o jsonpath.",
 		Title:      "Kubernetes: Deployments & Self-Healing",
 		Track:      TrackOrchestration,
 		Difficulty: Intermediate,
@@ -211,6 +213,7 @@ func kubernetesLab() Lab {
 func postgresLab() Lab {
 	return Lab{
 		ID:         "postgres-indexing",
+		Toolchain:  "`psql` inside the Postgres container, with PGUSER/PGDATABASE preset so plain `psql -c \"...\"` connects to the `lab` database. Table `events` is seeded with 200k rows.",
 		Title:      "Postgres: Indexes & Query Plans",
 		Track:      TrackData,
 		Difficulty: Intermediate,
@@ -314,6 +317,7 @@ func postgresLab() Lab {
 func redisLab() Lab {
 	return Lab{
 		ID:         "redis-caching",
+		Toolchain:  "`redis-cli` inside the Redis container, connecting to localhost with no auth. `redis-cli EVAL` runs Lua server-side, which is the fast way to write many keys.",
 		Title:      "Redis: TTLs, Eviction & Hit Rate",
 		Track:      TrackData,
 		Difficulty: Beginner,
@@ -408,6 +412,7 @@ func redisLab() Lab {
 func kafkaLab() Lab {
 	return Lab{
 		ID:         "kafka-partitions",
+		Toolchain:  "`rpk` inside the Redpanda broker container, already pointed at the local cluster. Add `--format json` for machine-readable output. No `jq` — use grep and awk.",
 		Title:      "Kafka: Partitions, Consumer Groups & Lag",
 		Track:      TrackMessaging,
 		Difficulty: Intermediate,

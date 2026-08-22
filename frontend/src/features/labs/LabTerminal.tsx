@@ -3,6 +3,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { AlertTriangle } from 'lucide-react';
 import { labTerminalURL } from '@/lib/api';
+import { clearTerminalBuffer, recordTerminalOutput } from '@/store/labAssistantStore';
 import '@xterm/xterm/css/xterm.css';
 
 /**
@@ -59,9 +60,14 @@ export function LabTerminal({ sessionId }: { sessionId: string }) {
       sendResize();
       term.focus();
     };
+    const decoder = new TextDecoder();
     socket.onmessage = (event) => {
       if (typeof event.data === 'string') return; // control frames (e.g. exit)
-      term.write(new Uint8Array(event.data));
+      const bytes = new Uint8Array(event.data);
+      term.write(bytes);
+      // Keep a tail of the session so the assistant can be asked about a real
+      // error rather than a description of one.
+      recordTerminalOutput(sessionId, decoder.decode(bytes, { stream: true }));
     };
     socket.onclose = () => {
       setState('closed');
@@ -91,6 +97,7 @@ export function LabTerminal({ sessionId }: { sessionId: string }) {
       keys.dispose();
       socket.close();
       term.dispose();
+      clearTerminalBuffer();
     };
   }, [sessionId]);
 

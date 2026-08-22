@@ -8,6 +8,7 @@ import {
   ExternalLink,
   FlaskConical,
   Lightbulb,
+  Sparkles,
   ListChecks,
   Square,
   Timer,
@@ -18,6 +19,8 @@ import { useLabStore } from '@/store/labStore';
 import type { Lab, LabSession, LabTask, LabTaskState } from '@/types/lab';
 import { useLabSession, useLabStatus, useStopLab, useVerifyLab } from './useLabs';
 import { LabTerminal } from './LabTerminal';
+import { LabAssistantDrawer } from './LabAssistantDrawer';
+import { useLabAssistantStore } from '@/store/labAssistantStore';
 
 /** The running-lab screen: objectives on the left, a real shell on the right. */
 export function LabWorkspace({ sessionId }: { sessionId: string }) {
@@ -52,6 +55,16 @@ export function LabWorkspace({ sessionId }: { sessionId: string }) {
         <div className="ml-auto flex items-center gap-3">
           <Endpoints session={session} />
           {session.status === 'ready' && <ExpiryTimer expiresAt={session.expiresAt} />}
+          {session.status === 'ready' && status?.assistant && (
+            <button
+              type="button"
+              onClick={() => useLabAssistantStore.getState().setOpen(true)}
+              className="flex items-center gap-1.5 rounded-md border border-accent/30 bg-accent/10 px-2.5 py-1.5 text-[12px] text-accent transition-colors hover:bg-accent/20"
+            >
+              <Sparkles className="h-3 w-3" />
+              Assistant
+            </button>
+          )}
           <button
             type="button"
             disabled={stop.isPending || session.status === 'stopped'}
@@ -86,6 +99,10 @@ export function LabWorkspace({ sessionId }: { sessionId: string }) {
             <LabTerminal sessionId={sessionId} />
           </div>
         </div>
+      )}
+
+      {session.status === 'ready' && status?.assistant && (
+        <LabAssistantDrawer sessionId={sessionId} lab={lab} />
       )}
     </div>
   );

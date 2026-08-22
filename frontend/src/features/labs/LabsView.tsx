@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Boxes,
@@ -17,6 +18,8 @@ import { useLabStore } from '@/store/labStore';
 import type { Lab, LabTrack } from '@/types/lab';
 import { useLabStatus, useStartLab } from './useLabs';
 import { LabWorkspace } from './LabWorkspace';
+import { LabGuide } from './LabGuide';
+import { LabDemo } from './LabDemo';
 
 const TRACK_META: Record<LabTrack, { label: string; icon: React.ReactNode }> = {
   storage: { label: 'Storage', icon: <HardDrive className="h-4 w-4" /> },
@@ -41,6 +44,7 @@ const DIFFICULTY_STYLE: Record<string, string> = {
 export function LabsView() {
   const sessionId = useLabStore((s) => s.sessionId);
   const { data: status, isLoading } = useLabStatus();
+  const [showDemo, setShowDemo] = useState(false);
 
   if (sessionId) return <LabWorkspace sessionId={sessionId} />;
 
@@ -63,6 +67,10 @@ export function LabsView() {
           </p>
         </header>
 
+        <div className="mb-6">
+          <LabGuide onWatchDemo={() => setShowDemo(true)} />
+        </div>
+
         {isLoading ? (
           <div className="flex items-center gap-3 text-sm text-ink-faint">
             <Spinner className="h-4 w-4" /> Checking the lab runtime…
@@ -83,7 +91,20 @@ export function LabsView() {
           <Notice
             tone="warn"
             title="Docker isn't reachable"
-            body="Start Docker Desktop (or your container runtime) and this page will pick it up — the lab catalog below is ready to go."
+            body={
+              <>
+                Start Docker Desktop (or your container runtime) and this page will pick it up — the
+                lab catalog below is ready to go. In the meantime you can{' '}
+                <button
+                  type="button"
+                  onClick={() => setShowDemo(true)}
+                  className="underline underline-offset-2 hover:text-ink"
+                >
+                  watch a recorded lab session
+                </button>
+                .
+              </>
+            }
           />
         ) : null}
 
@@ -106,6 +127,8 @@ export function LabsView() {
           ))}
         </div>
       </div>
+
+      {showDemo && <LabDemo onClose={() => setShowDemo(false)} />}
     </div>
   );
 }

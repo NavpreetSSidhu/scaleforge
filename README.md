@@ -253,7 +253,7 @@ ScaleForge ships an optional AI assistant that **explains** the current architec
 and apply to the canvas.
 
 - Backed by [Groq](https://console.groq.com)'s free, OpenAI-compatible API (default model
-  `llama-3.3-70b-versatile`). Set `GROQ_API_KEY` to enable it; the provider is a swappable
+  `openai/gpt-oss-120b`). Set `GROQ_API_KEY` to enable it; the provider is a swappable
   seam (`internal/assist`), so any OpenAI-style endpoint works.
 - The model returns a constrained JSON envelope (`{ reply, actions }`). Every action is
   **validated server-side against the catalog and the current graph** before reaching the
@@ -343,6 +343,34 @@ The two AWS labs run against [floci](https://github.com/floci-io/floci), an MIT-
 local AWS emulator, driven with the genuine AWS CLI. Because Labs already composes
 multi-container environments, floci arrives as one more service — which makes the rest of
 its ~75 emulated services a matter of authoring objectives rather than writing code.
+
+### Guide, demo, and the AI assistant
+
+Three things make Labs approachable rather than just powerful:
+
+- **A guide** on the catalog explains the model in three steps — real containers, a real
+  shell, objectives checked against live state — because a grid of cards undersells what
+  the page actually does. Dismissible, and reopenable.
+- **A demo** replays a real S3 session: commands typing out, real output, objectives
+  ticking. It needs no Docker, so the feature is legible even when the runtime isn't
+  running — which is exactly when the catalog would otherwise be a wall of dead buttons.
+  It is labelled `replay` so it can't be mistaken for a live lab.
+- **An assistant** beside a running lab (`internal/labassist`) that explains what's
+  happening and proposes the commands to get where you want.
+
+The assistant is grounded in the live session: which lab it is, what the workstation's
+toolchain is, which objectives are outstanding and *what the last check said about them*,
+and the tail of your own terminal — so "why did that fail?" is answered against the real
+error rather than a guess.
+
+It proposes; it never acts. Commands come back as reviewable chips and run only when you
+accept them, in the same workstation container the terminal is attached to — so it grants
+nothing you don't already have by typing. A batch stops at the first failure, since later
+commands normally assume the earlier ones worked. Asked a conceptual question, it answers
+with no commands at all, and it won't hand over an objective's answer unless you ask for it
+directly.
+
+Labs work fully without an LLM key; the assistant entry point is simply hidden.
 
 ### How a lab is put together
 

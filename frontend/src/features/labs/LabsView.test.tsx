@@ -32,6 +32,7 @@ const s3Lab: Lab = {
   difficulty: 'beginner',
   minutes: 20,
   concepts: ['Buckets & keys', 'Object versioning'],
+  toolchain: 'AWS CLI v2 (`aws`), preset endpoint.',
   fidelity: 'real',
   services: [{ name: 'minio', image: 'minio/minio:latest' }],
   tasks: [

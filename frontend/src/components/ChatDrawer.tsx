@@ -3,6 +3,7 @@ import type { StoreApi, UseBoundStore } from 'zustand';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowUp, Check, Sparkles, Trash2, Wand2, X } from 'lucide-react';
 import { Spinner } from '@/components/Spinner';
+import { Markdown } from '@/components/Markdown';
 import type { ChatEntry, ChatState } from '@/store/createChatStore';
 
 /** Message length cap — mirrored by the backend (`binding:"max=2000"`). */
@@ -31,6 +32,16 @@ export interface ChatDrawerProps<A> {
   welcomeTitle: string;
   welcomeBody: string;
   placeholder: string;
+  /**
+   * Heading and button wording for the proposed-actions block. Defaults suit a
+   * graph edit ("Proposed changes" / "Apply all"); a domain whose actions are
+   * commands to execute should say so instead.
+   */
+  actionsTitle?: string;
+  applyLabel?: string;
+  appliedLabel?: string;
+  /** Extra content rendered under an assistant turn, e.g. command output. */
+  renderExtra?: (entry: ChatEntry<A>) => ReactNode;
 }
 
 /**
@@ -51,6 +62,10 @@ export function ChatDrawer<A>({
   welcomeTitle,
   welcomeBody,
   placeholder,
+  actionsTitle = 'Proposed changes',
+  applyLabel = 'Apply all',
+  appliedLabel = 'Applied',
+  renderExtra,
 }: ChatDrawerProps<A>) {
   const open = store((s) => s.open);
   const setOpen = store((s) => s.setOpen);
@@ -149,7 +164,16 @@ export function ChatDrawer<A>({
               ) : (
                 <div className="space-y-4">
                   {messages.map((m) => (
-                    <ChatBubble key={m.id} entry={m} onApply={onApply} describeAction={describeAction} />
+                    <ChatBubble
+                      key={m.id}
+                      entry={m}
+                      onApply={onApply}
+                      describeAction={describeAction}
+                      actionsTitle={actionsTitle}
+                      applyLabel={applyLabel}
+                      appliedLabel={appliedLabel}
+                      renderExtra={renderExtra}
+                    />
                   ))}
                   {isThinking && (
                     <div className="flex items-center gap-2 text-sm text-ink-faint">
@@ -251,10 +275,18 @@ function ChatBubble<A>({
   entry,
   onApply,
   describeAction,
+  actionsTitle,
+  applyLabel,
+  appliedLabel,
+  renderExtra,
 }: {
   entry: ChatEntry<A>;
   onApply: (entry: ChatEntry<A>) => void;
   describeAction: (action: A) => ActionDescriptor;
+  actionsTitle: string;
+  applyLabel: string;
+  appliedLabel: string;
+  renderExtra?: (entry: ChatEntry<A>) => ReactNode;
 }) {
   if (entry.role === 'user') {
     return (
@@ -269,14 +301,15 @@ function ChatBubble<A>({
   const actions = entry.actions ?? [];
   return (
     <div className="space-y-2">
-      <div className="max-w-[92%] whitespace-pre-wrap rounded-2xl rounded-bl-sm border border-white/[0.06] bg-surface-panel/50 px-3.5 py-2.5 text-sm text-ink-muted">
-        {entry.content}
+      <div className="max-w-[92%] rounded-2xl rounded-bl-sm border border-white/[0.06] bg-surface-panel/50 px-3.5 py-2.5">
+        {/* Model replies are markdown; rendering them raw shows literal ** and `. */}
+        <Markdown>{entry.content}</Markdown>
       </div>
       {actions.length > 0 && (
         <div className="space-y-1.5 rounded-xl border border-white/[0.06] bg-surface-panel/30 p-2">
           <div className="flex items-center justify-between px-1">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-faint">
-              Proposed changes
+              {actionsTitle}
             </span>
             {!entry.applied && (
               <button
@@ -284,12 +317,12 @@ function ChatBubble<A>({
                 onClick={() => onApply(entry)}
                 className="flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-xs font-medium text-black transition hover:brightness-110"
               >
-                <Check className="h-3 w-3" /> Apply all
+                <Check className="h-3 w-3" /> {applyLabel}
               </button>
             )}
             {entry.applied && (
               <span className="flex items-center gap-1 text-xs text-accent">
-                <Check className="h-3 w-3" /> Applied
+                <Check className="h-3 w-3" /> {appliedLabel}
               </span>
             )}
           </div>
@@ -298,7 +331,25 @@ function ChatBubble<A>({
           ))}
         </div>
       )}
+      {renderExtra?.(entry)}
     </div>
+  );
+}
+
+/**
+ * Renders `backtick spans` in a one-line rationale as inline code. The full
+ * markdown renderer is the wrong tool here — its block spacing would break the
+ * chip layout — but leaving the backticks visible looks like a bug.
+ */
+function withInlineCode(text: string): ReactNode[] {
+  return text.split(/(`[^`]+`)/g).map((part, i) =>
+    part.startsWith('`') && part.endsWith('`') && part.length > 2 ? (
+      <code key={i} className="rounded bg-surface px-1 py-0.5 font-mono text-[0.95em] text-accent">
+        {part.slice(1, -1)}
+      </code>
+    ) : (
+      part
+    ),
   );
 }
 
@@ -308,7 +359,9 @@ function ActionChip({ descriptor }: { descriptor: ActionDescriptor }) {
       <span className="mt-0.5 shrink-0 text-ink-faint">{descriptor.icon}</span>
       <div className="min-w-0">
         <span className="text-ink">{descriptor.text}</span>
-        {descriptor.rationale && <span className="block text-ink-ghost">{descriptor.rationale}</span>}
+        {descriptor.rationale && (
+          <span className="block text-ink-ghost">{withInlineCode(descriptor.rationale)}</span>
+        )}
       </div>
     </div>
   );

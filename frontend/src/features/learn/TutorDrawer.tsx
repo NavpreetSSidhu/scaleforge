@@ -8,7 +8,7 @@ import { useSnackbar } from '@/store/snackbarStore';
 import { courseBySlug } from '@/data/courses';
 import { Spinner } from '@/components/Spinner';
 import type { TutorMessage } from '@/types/domain';
-import { Markdown } from './Markdown';
+import { Markdown } from '@/components/Markdown';
 
 /** Message length cap — mirrored by the backend (`binding:"max=2000"`). */
 const MAX_CHARS = 2000;
