@@ -13,6 +13,7 @@ func s3Lab() Lab {
 		Difficulty: Beginner,
 		Minutes:    20,
 		Verified:   true,
+		Fidelity:   FidelityReal,
 		Blurb:      "Drive a real S3-compatible store with the real AWS CLI. Create buckets, put objects, turn on versioning, then see why a delete isn't a delete.",
 		Concepts:   []string{"Buckets & keys", "Object versioning", "Delete markers", "S3 API vs filesystem"},
 		Services: []Service{{
@@ -90,6 +91,24 @@ func s3Lab() Lab {
 				Pass:  "A delete marker exists — the versions underneath are still recoverable.",
 				Fail:  "No delete marker found on `notes/hello.txt` yet.",
 			},
+			{
+				ID:    "restore-version",
+				Title: "Bring the object back",
+				Brief: "Because the delete only wrote a marker, the object is recoverable. Remove the **delete marker by its version id** and `notes/hello.txt` reappears in a plain `ls`.\n\nThis is the whole reason versioning exists: an accidental delete is an undo, not an incident.",
+				Hint:  "VID=$(aws s3api list-object-versions --bucket scaleforge-lab --prefix notes/hello.txt --query 'DeleteMarkers[0].VersionId' --output text)\naws s3api delete-object --bucket scaleforge-lab --key notes/hello.txt --version-id \"$VID\"\naws s3 ls s3://scaleforge-lab/notes/",
+				Check: "aws s3api head-object --bucket scaleforge-lab --key notes/hello.txt",
+				Pass:  "`notes/hello.txt` is visible again — the delete has been undone.",
+				Fail:  "The object is still hidden behind a delete marker.",
+			},
+			{
+				ID:    "prefix-listing",
+				Title: "List by prefix, not by folder",
+				Brief: "Add an object under a second prefix, then list with `--prefix notes/`. S3 has no directories: the listing is a **prefix filter** over a flat keyspace, which is why listing a huge \"folder\" costs what it does.",
+				Hint:  "echo report > /tmp/r.txt && aws s3 cp /tmp/r.txt s3://scaleforge-lab/reports/q1.txt\naws s3api list-objects-v2 --bucket scaleforge-lab --prefix notes/ --query 'Contents[].Key'",
+				Check: "aws s3api head-object --bucket scaleforge-lab --key reports/q1.txt && [ \"$(aws s3api list-objects-v2 --bucket scaleforge-lab --prefix notes/ --query 'length(Contents)' --output text)\" = \"1\" ]",
+				Pass:  "Two prefixes exist and `notes/` lists exactly one object.",
+				Fail:  "Expected an object under `reports/` and exactly one under `notes/`.",
+			},
 		},
 	}
 }
@@ -104,6 +123,7 @@ func kubernetesLab() Lab {
 		Difficulty: Intermediate,
 		Minutes:    30,
 		Verified:   true,
+		Fidelity:   FidelityReal,
 		Blurb:      "A real single-node Kubernetes cluster in a container. Run deployments, kill pods and watch the control loop put them back, then expose them behind a Service.",
 		Concepts:   []string{"Namespaces", "Deployments & ReplicaSets", "Reconciliation loops", "Services & endpoints", "Scaling"},
 		Services: []Service{{
@@ -164,6 +184,24 @@ func kubernetesLab() Lab {
 				Pass:  "Deployment `web` is running 5/5 replicas.",
 				Fail:  "`web` isn't at 5 ready replicas yet.",
 			},
+			{
+				ID:    "readiness-probe",
+				Title: "Stop sending traffic to pods that aren't ready",
+				Brief: "A pod is added to a Service's endpoints as soon as it is *running* — which is not the same as *able to serve*. Add a **readiness probe** on `web` (HTTP GET `/` on port 80) so Kubernetes only routes to pods that answer.",
+				Hint:  "kubectl -n lab patch deployment web --type=json -p='[{\"op\":\"add\",\"path\":\"/spec/template/spec/containers/0/readinessProbe\",\"value\":{\"httpGet\":{\"path\":\"/\",\"port\":80},\"initialDelaySeconds\":1,\"periodSeconds\":5}}]'\nkubectl -n lab rollout status deploy/web",
+				Check: "kubectl -n lab get deploy web -o jsonpath='{.spec.template.spec.containers[0].readinessProbe.httpGet.path}' 2>/dev/null | grep -q . && [ \"$(kubectl -n lab get deploy web -o jsonpath='{.status.readyReplicas}')\" = \"5\" ]",
+				Pass:  "`web` has a readiness probe and all replicas pass it.",
+				Fail:  "No readiness probe on `web` yet, or the pods aren't all ready.",
+			},
+			{
+				ID:    "rolling-update",
+				Title: "Roll out a new image without downtime",
+				Brief: "Change the image to `nginx:1.27-alpine` and watch the rollout. The Deployment replaces pods **gradually**, keeping enough ready at all times — that is what the probe you just added is protecting.\n\nThen look at `kubectl -n lab rollout history deploy/web`: the previous ReplicaSet is retained, which is what makes an instant rollback possible.",
+				Hint:  "kubectl -n lab set image deployment/web nginx=nginx:1.27-alpine\nkubectl -n lab rollout status deploy/web\nkubectl -n lab rollout history deploy/web",
+				Check: "kubectl -n lab get deploy web -o jsonpath='{.spec.template.spec.containers[0].image}' | grep -q '1.27-alpine' && [ \"$(kubectl -n lab get deploy web -o jsonpath='{.status.updatedReplicas}')\" = \"5\" ]",
+				Pass:  "All 5 replicas are running the new image.",
+				Fail:  "`web` isn't fully rolled out to nginx:1.27-alpine yet.",
+			},
 		},
 	}
 }
@@ -178,6 +216,7 @@ func postgresLab() Lab {
 		Difficulty: Intermediate,
 		Minutes:    25,
 		Verified:   true,
+		Fidelity:   FidelityReal,
 		Blurb:      "A real Postgres with 200k seeded rows. Read EXPLAIN output, add the index that changes the plan, and prove the planner switched.",
 		Concepts:   []string{"Sequential vs index scans", "EXPLAIN ANALYZE", "Composite indexes", "Planner statistics"},
 		Services: []Service{{
@@ -248,6 +287,24 @@ func postgresLab() Lab {
 				Pass:  "An index on `events` has served at least one real query.",
 				Fail:  "No index scans recorded yet — run the query itself, not just EXPLAIN.",
 			},
+			{
+				ID:    "partial-index",
+				Title: "Index only the rows you actually query",
+				Brief: "Only a fraction of events are purchases, but a full index on `kind` covers every row. A **partial index** with `WHERE kind = 'purchase'` indexes just those — far smaller, cheaper to maintain, and just as fast for the query that matters.\n\nCreate one named `idx_events_purchases`.",
+				Hint:  "psql -c \"CREATE INDEX idx_events_purchases ON events (created_at) WHERE kind = 'purchase'\"\npsql -c \"SELECT pg_size_pretty(pg_relation_size('idx_events_purchases'))\"",
+				Check: "psql -tAc \"select 1 from pg_indexes where indexname='idx_events_purchases' and indexdef ilike '%where%purchase%'\" | grep -q 1",
+				Pass:  "A partial index on purchases exists.",
+				Fail:  "No partial index named `idx_events_purchases` with a WHERE clause yet.",
+			},
+			{
+				ID:    "bloat-check",
+				Title: "See what an update costs",
+				Brief: "Postgres never updates a row in place — it writes a **new version** and leaves the old one dead until vacuum reclaims it. Update every `click` event, then read `n_dead_tup` from `pg_stat_user_tables`.\n\nThat number is why a table you only ever `UPDATE` still grows, and why autovacuum matters.",
+				Hint:  "psql -c \"UPDATE events SET kind = 'click' WHERE kind = 'click'\"\npsql -c \"SELECT n_live_tup, n_dead_tup FROM pg_stat_user_tables WHERE relname='events'\"",
+				Check: "[ \"$(psql -tAc \"select n_dead_tup from pg_stat_user_tables where relname='events'\" | tr -d ' ')\" -gt 0 ]",
+				Pass:  "Dead tuples are visible — every UPDATE left an old row version behind.",
+				Fail:  "No dead tuples recorded yet — run an UPDATE that touches real rows.",
+			},
 		},
 	}
 }
@@ -262,6 +319,7 @@ func redisLab() Lab {
 		Difficulty: Beginner,
 		Minutes:    20,
 		Verified:   true,
+		Fidelity:   FidelityReal,
 		Blurb:      "A real Redis you can push past its memory limit. Set TTLs, choose an eviction policy, then fill the cache until keys actually get evicted.",
 		Concepts:   []string{"TTL & expiry", "maxmemory policies", "LRU eviction", "Cache hit ratio"},
 		Services: []Service{{
@@ -321,6 +379,104 @@ func redisLab() Lab {
 				Check: "[ \"$(redis-cli type user:1000)\" = \"hash\" ] && [ \"$(redis-cli hlen user:1000)\" -ge 4 ]",
 				Pass:  "`user:1000` is a single hash holding the record's fields.",
 				Fail:  "No hash at `user:1000` with at least 4 fields yet.",
+			},
+			{
+				ID:    "atomic-counter",
+				Title: "Count without losing writes",
+				Brief: "`GET` then `SET` is a lost-update waiting to happen: two clients read the same value and one overwrites the other. `INCRBY` is a **single atomic operation** on the server, so concurrent callers can't interleave.\n\nDrive `counter:hits` to at least 1000 using INCR-family commands only.",
+				Hint:  "redis-cli EVAL \"for i=1,1000 do redis.call('INCR','counter:hits') end return redis.call('GET','counter:hits')\" 0\nredis-cli GET counter:hits",
+				Check: "[ \"$(redis-cli get counter:hits | tr -d '\\r')\" -ge 1000 ]",
+				Pass:  "`counter:hits` reached 1000 via atomic increments.",
+				Fail:  "`counter:hits` is missing or below 1000.",
+			},
+			{
+				ID:    "durability",
+				Title: "Decide what survives a restart",
+				Brief: "A cache that loses everything on restart causes a thundering herd against your database. Redis offers **RDB snapshots** (periodic, fast, loses the tail) and **AOF** (append-only log, durable, larger).\n\nTurn AOF on, then confirm Redis reports it as enabled and loaded.",
+				Hint:  "redis-cli CONFIG SET appendonly yes\nredis-cli INFO persistence | grep -E 'aof_enabled|aof_last_bgrewrite_status'",
+				Check: "[ \"$(redis-cli config get appendonly | tail -1 | tr -d '\\r')\" = \"yes\" ] && redis-cli info persistence | grep -q 'aof_enabled:1'",
+				Pass:  "AOF persistence is on — writes are appended to a log that survives restart.",
+				Fail:  "`appendonly` isn't enabled yet.",
+			},
+		},
+	}
+}
+
+// kafkaLab runs Redpanda, which implements the Kafka protocol in real,
+// production software (not an emulator) and ships `rpk` in the same image — so
+// the terminal attaches straight to the broker.
+func kafkaLab() Lab {
+	return Lab{
+		ID:         "kafka-partitions",
+		Title:      "Kafka: Partitions, Consumer Groups & Lag",
+		Track:      TrackMessaging,
+		Difficulty: Intermediate,
+		Minutes:    25,
+		Verified:   true,
+		Fidelity:   FidelityReal,
+		Blurb:      "A real Kafka-protocol broker (Redpanda). Produce keyed records, watch a consumer group commit offsets, then build up real consumer lag and see why partition count is hard to change.",
+		Concepts:   []string{"Partitions & keys", "Ordering guarantees", "Consumer groups", "Offset commits", "Consumer lag"},
+		Services: []Service{{
+			Name:  "redpanda",
+			Image: "redpandadata/redpanda:latest",
+			// dev-container mode runs a single node with a small footprint; the
+			// advertised address must be the in-lab DNS name so clients can reconnect.
+			Cmd: []string{
+				"redpanda", "start", "--mode", "dev-container", "--smp", "1",
+				"--memory", "512M", "--overprovisioned",
+				"--kafka-addr", "PLAINTEXT://0.0.0.0:9092",
+				"--advertise-kafka-addr", "PLAINTEXT://redpanda:9092",
+			},
+			Ports: []dockerx.PortMap{{Label: "Kafka", Container: "9092"}},
+		}},
+		// The redpanda image ships rpk, so the terminal attaches to the broker.
+		Workstation: Workstation{Service: "redpanda"},
+		Ready:       "rpk cluster health 2>/dev/null | grep -qE 'Healthy:[[:space:]]+true'",
+		Tasks: []Task{
+			{
+				ID:    "create-topic",
+				Title: "Create a topic with 3 partitions",
+				Brief: "A topic is split into **partitions** — the unit of parallelism and of ordering. Create a topic `orders` with **3 partitions**.",
+				Hint:  "rpk topic create orders -p 3\nrpk topic describe orders -p",
+				Check: `rpk topic describe orders -p --format json 2>/dev/null | grep -q '"partitions":3'`,
+				Pass:  "Topic `orders` exists with 3 partitions.",
+				Fail:  "No topic `orders` with 3 partitions yet.",
+			},
+			{
+				ID:    "produce-keyed",
+				Title: "Produce records under one key",
+				Brief: "Kafka guarantees ordering **within a partition**, not across a topic. The record key decides the partition — so everything keyed `cust-42` lands in the same partition and stays in order.\n\nProduce at least **3 records** keyed `cust-42`.",
+				Hint:  "printf 'order-1\\norder-2\\norder-3\\n' | rpk topic produce orders -k cust-42\nrpk topic describe orders -p",
+				Check: `rpk topic describe orders -p --format json 2>/dev/null | grep -o '"high_watermark":[0-9]*' | cut -d: -f2 | awk '{s+=$1} END {exit !(s>=3)}'`,
+				Pass:  "The topic holds 3 or more records.",
+				Fail:  "Fewer than 3 records on `orders` so far.",
+			},
+			{
+				ID:    "consumer-group",
+				Title: "Consume as a group and commit offsets",
+				Brief: "A **consumer group** tracks how far it has read by committing an offset per partition. That commit is what makes a restart resume rather than replay.\n\nConsume the records as group `workers`.",
+				Hint:  "rpk topic consume orders -g workers -n 3 -o start\nrpk group describe workers",
+				Check: `rpk group describe workers --format json 2>/dev/null | grep -o '"current_offset":[-0-9]*' | cut -d: -f2 | awk '{if ($1 >= 0) f=1} END {exit !f}'`,
+				Pass:  "Group `workers` has committed an offset.",
+				Fail:  "No committed offsets for group `workers` yet.",
+			},
+			{
+				ID:    "lag",
+				Title: "Build up real consumer lag",
+				Brief: "**Lag** is the gap between the newest offset and what the group has committed — the single most important number for a streaming system's health.\n\nProduce 3 more records under the same key **without consuming them**, then read the group's lag.",
+				Hint:  "printf 'order-4\\norder-5\\norder-6\\n' | rpk topic produce orders -k cust-42\nrpk group describe workers",
+				Check: `rpk group describe workers --format json 2>/dev/null | grep -o '"total_lag":[0-9]*' | cut -d: -f2 | awk '{exit !($1 > 0)}'`,
+				Pass:  "Group `workers` is now lagging behind the topic.",
+				Fail:  "No lag yet — produce more records without consuming them.",
+			},
+			{
+				ID:    "add-partitions",
+				Title: "Add partitions — and break key affinity",
+				Brief: "Scale `orders` to **6 partitions**. Partitions can be added but never removed.\n\nAdding them also **rehashes keys**: `cust-42` may now map to a different partition, so records for that key exist in two places and their relative order is no longer guaranteed. This is why partition count is sized up front rather than tuned later.",
+				Hint:  "rpk topic add-partitions orders -n 3\nrpk topic describe orders -p",
+				Check: `rpk topic describe orders -p --format json 2>/dev/null | grep -q '"partitions":6'`,
+				Pass:  "Topic `orders` now has 6 partitions.",
+				Fail:  "`orders` isn't at 6 partitions yet.",
 			},
 		},
 	}

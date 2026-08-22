@@ -9,12 +9,24 @@ const (
 	Advanced     = "advanced"
 )
 
+// Fidelity records whether a lab runs the genuine software or an emulation of
+// it. The distinction is not cosmetic: what you learn from real Postgres holds in
+// production, while an emulated AWS API is faithful to the *interface* and data
+// model but not to performance, limits, or failure behaviour. The UI says which
+// so nobody mistakes one for the other.
+const (
+	FidelityReal     = "real"
+	FidelityEmulated = "emulated"
+)
+
 // Track groups labs into the infrastructure area they teach.
 const (
 	TrackStorage       = "storage"
 	TrackOrchestration = "orchestration"
 	TrackData          = "data"
 	TrackMesh          = "mesh"
+	TrackMessaging     = "messaging"
+	TrackCloudAPI      = "cloud-api"
 )
 
 // Service is a backing container in a lab's environment. Services share a
@@ -70,15 +82,20 @@ type Task struct {
 // Lab is a complete learning environment: real containers, a real shell, and a
 // list of objectives verified against real state.
 type Lab struct {
-	ID          string      `json:"id"`
-	Title       string      `json:"title"`
-	Track       string      `json:"track"`
-	Blurb       string      `json:"blurb"`
-	Difficulty  string      `json:"difficulty"`
-	Minutes     int         `json:"minutes"`
-	Concepts    []string    `json:"concepts"`
-	Services    []Service   `json:"services"`
-	Workstation Workstation `json:"-"`
+	ID         string   `json:"id"`
+	Title      string   `json:"title"`
+	Track      string   `json:"track"`
+	Blurb      string   `json:"blurb"`
+	Difficulty string   `json:"difficulty"`
+	Minutes    int      `json:"minutes"`
+	Concepts   []string `json:"concepts"`
+	// Fidelity is FidelityReal or FidelityEmulated.
+	Fidelity string `json:"fidelity"`
+	// FidelityNote explains, for an emulated lab, what the emulator is and is not
+	// faithful to. Required when Fidelity is FidelityEmulated.
+	FidelityNote string      `json:"fidelityNote,omitempty"`
+	Services     []Service   `json:"services"`
+	Workstation  Workstation `json:"-"`
 	// Ready is polled in the workstation until it exits 0 — the signal that every
 	// service is actually serving, not merely that the container started.
 	Ready string `json:"-"`
@@ -117,5 +134,13 @@ func (c *Catalog) Get(id string) (Lab, bool) {
 }
 
 func builtinLabs() []Lab {
-	return []Lab{s3Lab(), kubernetesLab(), postgresLab(), redisLab()}
+	return []Lab{
+		s3Lab(),
+		kubernetesLab(),
+		postgresLab(),
+		redisLab(),
+		kafkaLab(),
+		dynamoLab(),
+		queueLab(),
+	}
 }

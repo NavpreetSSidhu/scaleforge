@@ -60,6 +60,12 @@ func solutions() []solution {
 				{"aws s3api put-bucket-versioning --bucket scaleforge-lab --versioning-configuration Status=Enabled", "enable-versioning"},
 				{"echo v2 > /tmp/h.txt && aws s3 cp /tmp/h.txt s3://scaleforge-lab/notes/hello.txt", "overwrite-version"},
 				{"aws s3 rm s3://scaleforge-lab/notes/hello.txt", "delete-marker"},
+				{
+					`VID=$(aws s3api list-object-versions --bucket scaleforge-lab --prefix notes/hello.txt --query 'DeleteMarkers[0].VersionId' --output text) && ` +
+						`aws s3api delete-object --bucket scaleforge-lab --key notes/hello.txt --version-id "$VID"`,
+					"restore-version",
+				},
+				{"echo report > /tmp/r.txt && aws s3 cp /tmp/r.txt s3://scaleforge-lab/reports/q1.txt", "prefix-listing"},
 			},
 		},
 		{
@@ -87,6 +93,18 @@ func solutions() []solution {
 						"kubectl -n lab rollout status deploy/web --timeout=300s",
 					"scale",
 				},
+				{
+					`kubectl -n lab patch deployment web --type=json ` +
+						`-p='[{"op":"add","path":"/spec/template/spec/containers/0/readinessProbe",` +
+						`"value":{"httpGet":{"path":"/","port":80},"initialDelaySeconds":1,"periodSeconds":5}}]' && ` +
+						"kubectl -n lab rollout status deploy/web --timeout=300s",
+					"readiness-probe",
+				},
+				{
+					"kubectl -n lab set image deployment/web nginx=nginx:1.27-alpine && " +
+						"kubectl -n lab rollout status deploy/web --timeout=300s",
+					"rolling-update",
+				},
 			},
 		},
 		{
@@ -98,6 +116,8 @@ func solutions() []solution {
 				{"psql -v ON_ERROR_STOP=1 -c 'CREATE INDEX idx_events_user_created ON events (user_id, created_at DESC)'", "composite"},
 				{"psql -v ON_ERROR_STOP=1 -c 'ANALYZE events'", "no-sort"},
 				{"psql -v ON_ERROR_STOP=1 -c 'SELECT count(*) FROM events WHERE user_id = 42'", "index-used"},
+				{`psql -v ON_ERROR_STOP=1 -c "CREATE INDEX idx_events_purchases ON events (created_at) WHERE kind = 'purchase'"`, "partial-index"},
+				{`psql -v ON_ERROR_STOP=1 -c "UPDATE events SET kind = 'click' WHERE kind = 'click'"`, "bloat-check"},
 			},
 		},
 		{
@@ -109,6 +129,96 @@ func solutions() []solution {
 				{"redis-cli CONFIG SET maxmemory 4mb", "maxmemory"},
 				{`redis-cli EVAL "for i=1,60000 do redis.call('SET','pad:'..i,string.rep('x',512)) end return 1" 0`, "evict"},
 				{"redis-cli HSET user:1000 name ada email ada@example.com plan pro region eu", "hash-packing"},
+				{`redis-cli EVAL "for i=1,1000 do redis.call('INCR','counter:hits') end return 1" 0`, "atomic-counter"},
+				{"redis-cli CONFIG SET appendonly yes", "durability"},
+			},
+		},
+		{
+			labID:  "kafka-partitions",
+			budget: 4 * time.Minute,
+			steps: []step{
+				{"rpk topic create orders -p 3", "create-topic"},
+				{`printf 'order-1\norder-2\norder-3\n' | rpk topic produce orders -k cust-42`, "produce-keyed"},
+				{"rpk topic consume orders -g workers -n 3 -o start >/dev/null", "consumer-group"},
+				{`printf 'order-4\norder-5\norder-6\n' | rpk topic produce orders -k cust-42`, "lag"},
+				{"rpk topic add-partitions orders -n 3", "add-partitions"},
+			},
+		},
+		{
+			labID:  "dynamodb-modeling",
+			budget: 5 * time.Minute,
+			steps: []step{
+				{
+					"aws dynamodb create-table --table-name orders " +
+						"--attribute-definitions AttributeName=customerId,AttributeType=S AttributeName=orderedAt,AttributeType=S " +
+						"--key-schema AttributeName=customerId,KeyType=HASH AttributeName=orderedAt,KeyType=RANGE " +
+						"--billing-mode PAY_PER_REQUEST",
+					"create-table",
+				},
+				{
+					`for d in 2026-01-01 2026-01-02 2026-01-03; do ` +
+						`aws dynamodb put-item --table-name orders --item ` +
+						`"{\"customerId\":{\"S\":\"c-1\"},\"orderedAt\":{\"S\":\"$d\"},\"orderStatus\":{\"S\":\"paid\"}}" || exit 1; done`,
+					"put-items",
+				},
+				{
+					`aws dynamodb put-item --table-name orders --item ` +
+						`'{"customerId":{"S":"c-1"},"orderedAt":{"S":"2026-02-01"},"orderStatus":{"S":"pending"}}'`,
+					"range-query",
+				},
+				{
+					"aws dynamodb update-table --table-name orders " +
+						"--attribute-definitions AttributeName=customerId,AttributeType=S AttributeName=orderedAt,AttributeType=S AttributeName=orderStatus,AttributeType=S " +
+						`--global-secondary-index-updates '[{"Create":{"IndexName":"byStatus","KeySchema":[{"AttributeName":"orderStatus","KeyType":"HASH"}],"Projection":{"ProjectionType":"ALL"}}}]'`,
+					"gsi",
+				},
+				{
+					`aws dynamodb update-item --table-name orders ` +
+						`--key '{"customerId":{"S":"c-1"},"orderedAt":{"S":"2026-01-01"}}' ` +
+						`--update-expression 'SET version = :new' ` +
+						`--condition-expression 'attribute_not_exists(version)' ` +
+						`--expression-attribute-values '{":new":{"N":"2"}}'`,
+					"conditional-write",
+				},
+				{
+					"aws dynamodb update-time-to-live --table-name orders " +
+						"--time-to-live-specification 'Enabled=true,AttributeName=expiresAt'",
+					"ttl",
+				},
+			},
+		},
+		{
+			labID:  "sqs-sns-messaging",
+			budget: 5 * time.Minute,
+			steps: []step{
+				{"aws sqs create-queue --queue-name jobs", "create-queue"},
+				{
+					`Q=$(aws sqs get-queue-url --queue-name jobs --query QueueUrl --output text) && ` +
+						`aws sqs send-message --queue-url "$Q" --message-body resize-image-1`,
+					"send-receive",
+				},
+				{
+					`Q=$(aws sqs get-queue-url --queue-name jobs --query QueueUrl --output text) && ` +
+						`aws sqs set-queue-attributes --queue-url "$Q" --attributes VisibilityTimeout=5`,
+					"visibility-timeout",
+				},
+				{
+					`aws sqs create-queue --queue-name jobs-dlq >/dev/null && ` +
+						`DLQ=$(aws sqs get-queue-url --queue-name jobs-dlq --query QueueUrl --output text) && ` +
+						`ARN=$(aws sqs get-queue-attributes --queue-url "$DLQ" --attribute-names QueueArn --query Attributes.QueueArn --output text) && ` +
+						`Q=$(aws sqs get-queue-url --queue-name jobs --query QueueUrl --output text) && ` +
+						`aws sqs set-queue-attributes --queue-url "$Q" --attributes ` +
+						`"{\"RedrivePolicy\":\"{\\\"deadLetterTargetArn\\\":\\\"$ARN\\\",\\\"maxReceiveCount\\\":\\\"2\\\"}\"}"`,
+					"dead-letter",
+				},
+				{
+					`TOPIC=$(aws sns create-topic --name order-events --query TopicArn --output text) && ` +
+						`aws sqs create-queue --queue-name audit >/dev/null && ` +
+						`AQ=$(aws sqs get-queue-url --queue-name audit --query QueueUrl --output text) && ` +
+						`AARN=$(aws sqs get-queue-attributes --queue-url "$AQ" --attribute-names QueueArn --query Attributes.QueueArn --output text) && ` +
+						`aws sns subscribe --topic-arn "$TOPIC" --protocol sqs --notification-endpoint "$AARN"`,
+					"fanout",
+				},
 			},
 		},
 	}

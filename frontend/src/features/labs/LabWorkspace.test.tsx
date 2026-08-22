@@ -37,6 +37,7 @@ const lab: Lab = {
   difficulty: 'beginner',
   minutes: 20,
   concepts: [],
+  fidelity: 'real',
   services: [{ name: 'minio', image: 'minio/minio:latest' }],
   tasks: [
     { id: 'create-bucket', title: 'Create a bucket', brief: 'Create a bucket named `x`.' },
@@ -131,6 +132,32 @@ describe('LabWorkspace', () => {
     expect(await screen.findByText('1/2')).toBeInTheDocument();
     expect(screen.getByText('Bucket `x` exists.')).toBeInTheDocument();
     expect(screen.getByText('No object at that key.')).toBeInTheDocument();
+  });
+
+  // The card badge is out of sight once you're inside typing commands, so the
+  // caveat is restated where the work happens.
+  it('keeps the emulator caveat visible inside an emulated lab', async () => {
+    getLabStatus.mockResolvedValue({
+      enabled: true,
+      docker: true,
+      labs: [{ ...lab, fidelity: 'emulated' as const, fidelityNote: 'Runs against the floci emulator, not AWS.' }],
+    });
+    getLabSession.mockResolvedValue(session());
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <LabWorkspace sessionId="sess-1" />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText(/not AWS/i)).toBeInTheDocument();
+  });
+
+  it('shows no emulator caveat for a real-software lab', async () => {
+    renderWorkspace(session());
+
+    await screen.findByText('terminal:sess-1');
+    expect(screen.queryByText(/emulator/i)).not.toBeInTheDocument();
   });
 
   it('links out to a published endpoint', async () => {

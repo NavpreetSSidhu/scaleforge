@@ -2,7 +2,10 @@ import { motion } from 'framer-motion';
 import {
   Boxes,
   Clock,
+  Cloud,
   Container,
+  FlaskConical,
+  Radio,
   Database,
   HardDrive,
   Network,
@@ -17,6 +20,8 @@ import { LabWorkspace } from './LabWorkspace';
 
 const TRACK_META: Record<LabTrack, { label: string; icon: React.ReactNode }> = {
   storage: { label: 'Storage', icon: <HardDrive className="h-4 w-4" /> },
+  messaging: { label: 'Messaging & Streaming', icon: <Radio className="h-4 w-4" /> },
+  'cloud-api': { label: 'Cloud APIs', icon: <Cloud className="h-4 w-4" /> },
   orchestration: { label: 'Orchestration', icon: <Boxes className="h-4 w-4" /> },
   data: { label: 'Data', icon: <Database className="h-4 w-4" /> },
   mesh: { label: 'Service Mesh', icon: <Network className="h-4 w-4" /> },
@@ -117,13 +122,24 @@ function LabCard({ lab, runnable }: { lab: Lab; runnable: boolean }) {
     >
       <div className="flex items-start justify-between gap-3">
         <h3 className="text-sm font-semibold text-ink">{lab.title}</h3>
-        <span
-          className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase ${
-            DIFFICULTY_STYLE[lab.difficulty] ?? DIFFICULTY_STYLE.beginner
-          }`}
-        >
-          {lab.difficulty}
-        </span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {lab.fidelity === 'emulated' && (
+            <span
+              title={lab.fidelityNote}
+              className="flex items-center gap-1 rounded border border-violet/30 bg-violet/10 px-1.5 py-0.5 font-mono text-[10px] uppercase text-violet"
+            >
+              <FlaskConical className="h-2.5 w-2.5" />
+              emulated
+            </span>
+          )}
+          <span
+            className={`rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase ${
+              DIFFICULTY_STYLE[lab.difficulty] ?? DIFFICULTY_STYLE.beginner
+            }`}
+          >
+            {lab.difficulty}
+          </span>
+        </div>
       </div>
 
       <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">{lab.blurb}</p>
@@ -193,7 +209,7 @@ function Notice({
 
 /** Groups labs by track, preserving catalog order within each track. */
 function groupByTrack(labs: Lab[]): [LabTrack, Lab[]][] {
-  const order: LabTrack[] = ['storage', 'orchestration', 'data', 'mesh'];
+  const order: LabTrack[] = ['storage', 'orchestration', 'data', 'messaging', 'cloud-api', 'mesh'];
   return order
     .map((track) => [track, labs.filter((l) => l.track === track)] as [LabTrack, Lab[]])
     .filter(([, group]) => group.length > 0);

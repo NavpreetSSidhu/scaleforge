@@ -6,6 +6,7 @@ import {
   Circle,
   CircleDot,
   ExternalLink,
+  FlaskConical,
   Lightbulb,
   ListChecks,
   Square,
@@ -69,6 +70,13 @@ export function LabWorkspace({ sessionId }: { sessionId: string }) {
         <div className="flex min-h-0 flex-1 items-center justify-center px-6 text-center text-sm text-ink-faint">
           This environment has been torn down. Its containers and network are gone.
         </div>
+      )}
+
+      {session.status === 'ready' && lab?.fidelity === 'emulated' && lab.fidelityNote && (
+        <p className="flex items-start gap-2 border-b border-violet/20 bg-violet/[0.06] px-4 py-2 text-[12px] leading-relaxed text-violet">
+          <FlaskConical className="mt-px h-3.5 w-3.5 shrink-0" />
+          <span>{lab.fidelityNote}</span>
+        </p>
       )}
 
       {session.status === 'ready' && lab && (

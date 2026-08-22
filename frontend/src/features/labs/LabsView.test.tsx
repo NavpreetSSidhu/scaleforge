@@ -32,12 +32,22 @@ const s3Lab: Lab = {
   difficulty: 'beginner',
   minutes: 20,
   concepts: ['Buckets & keys', 'Object versioning'],
+  fidelity: 'real',
   services: [{ name: 'minio', image: 'minio/minio:latest' }],
   tasks: [
     { id: 'create-bucket', title: 'Create a bucket', brief: 'Create one.' },
     { id: 'put-object', title: 'Upload an object', brief: 'Upload one.' },
   ],
   verified: true,
+};
+
+const emulatedLab: Lab = {
+  ...s3Lab,
+  id: 'dynamodb-modeling',
+  title: 'DynamoDB: Keys, Indexes & Conditional Writes',
+  track: 'cloud-api',
+  fidelity: 'emulated',
+  fidelityNote: 'Runs against the floci AWS emulator, not AWS.',
 };
 
 const k8sLab: Lab = {
@@ -99,6 +109,30 @@ describe('LabsView', () => {
     renderLabs({});
 
     expect(await screen.findByRole('button', { name: /start lab/i })).toBeEnabled();
+  });
+
+  // The distinction is the honesty mechanism: a floci-backed DynamoDB lab must
+  // not read as teaching production DynamoDB the way the Postgres lab teaches
+  // production Postgres.
+  it('marks an emulated lab as emulated', async () => {
+    renderLabs({ labs: [emulatedLab] });
+
+    expect(await screen.findByText(/emulated/i)).toBeInTheDocument();
+  });
+
+  it('does not mark a real-software lab as emulated', async () => {
+    renderLabs({ labs: [s3Lab] });
+
+    await screen.findByText(s3Lab.title);
+    expect(screen.queryByText(/emulated/i)).not.toBeInTheDocument();
+  });
+
+  it('groups labs from every track, including messaging and cloud APIs', async () => {
+    renderLabs({ labs: [s3Lab, emulatedLab, { ...s3Lab, id: 'k', title: 'Kafka', track: 'messaging' }] });
+
+    expect(await screen.findByText('Storage')).toBeInTheDocument();
+    expect(screen.getByText('Cloud APIs')).toBeInTheDocument();
+    expect(screen.getByText('Messaging & Streaming')).toBeInTheDocument();
   });
 
   it('flags unverified labs as preview so rough edges are expected', async () => {

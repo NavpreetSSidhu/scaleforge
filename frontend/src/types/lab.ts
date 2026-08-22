@@ -1,7 +1,14 @@
 /** Types for ScaleForge Labs — real containerised environments you drive from a terminal. */
 
 export type LabDifficulty = 'beginner' | 'intermediate' | 'advanced';
-export type LabTrack = 'storage' | 'orchestration' | 'data' | 'mesh';
+export type LabTrack = 'storage' | 'orchestration' | 'data' | 'mesh' | 'messaging' | 'cloud-api';
+
+/**
+ * Whether a lab runs the genuine software or an emulation of it. What you learn
+ * from real Postgres holds in production; an emulated AWS API is faithful to the
+ * interface but not to performance, quotas, or failure behaviour.
+ */
+export type LabFidelity = 'real' | 'emulated';
 
 export interface LabService {
   name: string;
@@ -23,6 +30,9 @@ export interface Lab {
   difficulty: LabDifficulty;
   minutes: number;
   concepts: string[];
+  fidelity: LabFidelity;
+  /** For an emulated lab, what the emulator is and isn't faithful to. */
+  fidelityNote?: string;
   services: LabService[];
   tasks: LabTask[];
   /** False for labs whose environment hasn't been exercised end to end yet. */

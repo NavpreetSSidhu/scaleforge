@@ -91,6 +91,8 @@ jobs:
           docker pull rancher/k3s:latest
           docker pull postgres:16-alpine
           docker pull redis:7-alpine
+          docker pull redpandadata/redpanda:latest
+          docker pull floci/floci:latest
 
       # -parallel 1 runs the labs one at a time: a hosted runner does not have the
       # memory to stand up k3s, Postgres, MinIO and Redis simultaneously.

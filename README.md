@@ -324,12 +324,25 @@ Browser                     Go API                      Docker
 LABS_ENABLED=1   # in backend/.env, with Docker running
 ```
 
-| Lab | Environment | Teaches |
-| --- | --- | --- |
-| **S3: Buckets, Objects & Versioning** | `minio/minio` + `amazon/aws-cli` | Buckets vs. keys, versioning, why a delete writes a *delete marker* |
-| **Kubernetes: Deployments & Self-Healing** | `rancher/k3s` (real single-node cluster) | Namespaces, ReplicaSets, the reconciliation loop, Services, scaling |
-| **Postgres: Indexes & Query Plans** | `postgres:16-alpine`, 200k seeded rows | Seq vs. index scans, `EXPLAIN`, composite indexes, finding unused indexes |
-| **Redis: TTLs, Eviction & Hit Rate** | `redis:7-alpine` | TTLs, `maxmemory` policies, LRU eviction under real pressure, hash packing |
+Labs are marked **real** or **emulated**, and the distinction is not cosmetic. What you
+learn from real Postgres holds in production; an emulated AWS API is faithful to the
+interface and data model but not to throughput, quotas, or failure behaviour. The catalog
+badges it and the workspace restates it, rather than implying parity.
+
+| Lab | Environment | Fidelity | Teaches |
+| --- | --- | --- | --- |
+| **S3: Buckets, Objects & Versioning** | `minio/minio` + `amazon/aws-cli` | real | Buckets vs. keys, versioning, delete markers, restoring a delete, prefix listing |
+| **Kubernetes: Deployments & Self-Healing** | `rancher/k3s` (real single-node cluster) | real | Namespaces, ReplicaSets, the reconciliation loop, Services, readiness probes, rolling updates |
+| **Postgres: Indexes & Query Plans** | `postgres:16-alpine`, 200k seeded rows | real | Seq vs. index scans, `EXPLAIN`, composite and partial indexes, unused indexes, dead tuples |
+| **Redis: TTLs, Eviction & Hit Rate** | `redis:7-alpine` | real | TTLs, `maxmemory` policies, LRU eviction under real pressure, hash packing, atomicity, AOF |
+| **Kafka: Partitions, Consumer Groups & Lag** | `redpandadata/redpanda` | real | Partitions and key affinity, ordering guarantees, offset commits, consumer lag |
+| **DynamoDB: Keys, Indexes & Conditional Writes** | `floci` + `amazon/aws-cli` | emulated | Partition/sort keys, Query vs Scan, GSIs, conditional writes, TTL |
+| **SQS & SNS: Retries, Dead Letters & Fan-out** | `floci` + `amazon/aws-cli` | emulated | Visibility timeouts, at-least-once delivery, DLQ redrive, pub/sub fan-out |
+
+The two AWS labs run against [floci](https://github.com/floci-io/floci), an MIT-licensed
+local AWS emulator, driven with the genuine AWS CLI. Because Labs already composes
+multi-container environments, floci arrives as one more service — which makes the rest of
+its ~75 emulated services a matter of authoring objectives rather than writing code.
 
 ### How a lab is put together
 
