@@ -13,6 +13,7 @@ import { MobileView } from '@/features/mobile/MobileView';
 import { LearnView } from '@/features/learn/LearnView';
 import { StudioView } from '@/features/studio/StudioView';
 import { InterviewView } from '@/features/interview/InterviewView';
+import { LabsView } from '@/features/labs/LabsView';
 import { useStudioRun } from '@/features/studio/useStudioRun';
 import { useStudioStore } from '@/store/studioStore';
 import { ReportDrawer } from '@/features/report/ReportDrawer';
@@ -186,6 +187,7 @@ export default function App() {
       {view === 'learn' && <LearnView />}
       {view === 'interview' && <InterviewView />}
       {view === 'studio' && <StudioView />}
+      {view === 'labs' && <LabsView />}
 
       <ReportDrawer />
       <ReviewDrawer onRun={runSimulation} />

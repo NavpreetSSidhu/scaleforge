@@ -35,6 +35,12 @@ import type {
   TutorReply,
 } from '@/types/domain';
 import type {
+  Lab,
+  LabSession,
+  LabStatus,
+  LabVerifyResult,
+} from '@/types/lab';
+import type {
   AgentChatRequest,
   AgentChatResponse,
   AgentGraph,
@@ -95,6 +101,19 @@ export interface AuthResponse {
   user: AuthUser;
 }
 
+/**
+ * WebSocket URL for a lab's terminal. The API base is normally the `/api` proxy
+ * prefix, so the socket rides the same origin (and the same proxy) as every
+ * other call; an absolute VITE_API_URL is upgraded in place.
+ */
+export function labTerminalURL(sessionId: string): string {
+  const path = `/labs/sessions/${sessionId}/terminal`;
+  const base = API_BASE.startsWith('http')
+    ? API_BASE
+    : `${window.location.origin}${API_BASE}`;
+  return `${base.replace(/^http/, 'ws')}${path}`;
+}
+
 export const api = {
   signup: (payload: { email: string; name: string; password: string }) =>
     request<AuthResponse>('/auth/signup', { method: 'POST', body: JSON.stringify(payload) }),
@@ -141,6 +160,19 @@ export const api = {
     }),
 
   getSandboxStatus: () => request<{ enabled: boolean }>('/sandbox'),
+
+  // --- Labs: real containerised environments -------------------------------
+  getLabStatus: () => request<LabStatus>('/labs'),
+  listLabSessions: () => request<{ sessions: LabSession[] }>('/labs/sessions'),
+  startLabSession: (labId: Lab['id']) =>
+    request<LabSession>('/labs/sessions', { method: 'POST', body: JSON.stringify({ labId }) }),
+  getLabSession: (id: string) => request<LabSession>(`/labs/sessions/${id}`),
+  stopLabSession: (id: string) =>
+    request<{ stopped: boolean }>(`/labs/sessions/${id}`, { method: 'DELETE' }),
+  verifyLabSession: (id: string) =>
+    request<LabVerifyResult>(`/labs/sessions/${id}/verify`, { method: 'POST' }),
+  getLabHint: (id: string, taskId: string) =>
+    request<{ hint: string }>(`/labs/sessions/${id}/hint?task=${encodeURIComponent(taskId)}`),
 
   getReviewStatus: () => request<{ enabled: boolean }>('/review'),
 

@@ -42,7 +42,7 @@ func main() {
 	defer pool.Close()
 
 	store := postgres.NewStore(pool)
-	router := transport.NewRouter(cfg, transport.Dependencies{Store: store})
+	router, shutdownRouter := transport.NewRouter(cfg, transport.Dependencies{Store: store})
 
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	log.Printf("ScaleForge API listening on %s", addr)
@@ -58,5 +58,7 @@ func main() {
 	<-quit
 
 	log.Println("shutting down...")
+	// Stops any lab containers still running so they don't outlive the server.
+	shutdownRouter()
 	time.Sleep(100 * time.Millisecond)
 }

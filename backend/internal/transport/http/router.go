@@ -15,6 +15,7 @@ import (
 	"github.com/scaleforge/scaleforge/internal/cost"
 	"github.com/scaleforge/scaleforge/internal/course"
 	"github.com/scaleforge/scaleforge/internal/interview"
+	"github.com/scaleforge/scaleforge/internal/lab"
 	"github.com/scaleforge/scaleforge/internal/middleware"
 	"github.com/scaleforge/scaleforge/internal/pricing"
 	"github.com/scaleforge/scaleforge/internal/repository"
@@ -31,7 +32,11 @@ type Dependencies struct {
 	Store *postgres.Store
 }
 
-func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
+// NewRouter builds the HTTP router. It returns a shutdown func alongside it
+// because Labs owns resources that live *outside* this process — Docker
+// containers and networks — which must be torn down when the server exits
+// rather than left stranded on the host.
+func NewRouter(cfg *config.Config, deps Dependencies) (*gin.Engine, func()) {
 	gin.SetMode(cfg.GinMode)
 
 	r := gin.New()
@@ -74,6 +79,11 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 	// it. Opt-in via SANDBOX_ENABLED since it spawns a server and drives traffic.
 	sandboxService := sandbox.NewService(cfg.SandboxEnabled, catalogService)
 
+	// Labs is the container-backed vertical: each lab stands up real services on
+	// an isolated Docker network and attaches a browser terminal to a workstation
+	// inside it. Opt-in via LABS_ENABLED since it pulls images and holds memory.
+	labManager := lab.NewManager(cfg.LabsEnabled, lab.NewCatalog())
+
 	// The tutor reuses the same LLM provider; lesson content is authored client-
 	// side, so this only powers the Teacher/Q&A personas + progress persistence.
 	var tutorProvider tutor.Provider
@@ -111,6 +121,7 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 	reviewHandler := NewReviewHandler(reviewService)
 	interviewHandler := NewInterviewHandler(interviewService)
 	sandboxHandler := NewSandboxHandler(sandboxService)
+	labHandler := NewLabHandler(labManager, cfg.CORSOrigin)
 	tutorHandler := NewTutorHandler(tutorService)
 	courseHandler := NewCourseHandler(courseService)
 	agentflowHandler := NewAgentflowHandler(agentflowService, agentExecutor)
@@ -159,6 +170,17 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 		// SANDBOX_ENABLED + tightly rate-limited inside the handler.
 		guest.GET("/sandbox", sandboxHandler.Status)
 		guest.POST("/sandbox/run", sandboxHandler.Run)
+
+		// Labs: catalog + session lifecycle + objective verification. The
+		// terminal is a WebSocket upgrade, so it sits outside the JSON groups.
+		guest.GET("/labs", labHandler.Status)
+		guest.GET("/labs/sessions", labHandler.ListSessions)
+		guest.POST("/labs/sessions", labHandler.StartSession)
+		guest.GET("/labs/sessions/:id", labHandler.GetSession)
+		guest.DELETE("/labs/sessions/:id", labHandler.StopSession)
+		guest.POST("/labs/sessions/:id/verify", labHandler.Verify)
+		guest.GET("/labs/sessions/:id/hint", labHandler.Hint)
+		guest.GET("/labs/sessions/:id/terminal", labHandler.Terminal)
 
 		// Learn module: authored lessons render client-side; these power the two
 		// AI personas (gated by API key, rate-limited inside the handler).
@@ -215,7 +237,7 @@ func NewRouter(cfg *config.Config, deps Dependencies) *gin.Engine {
 		authed.DELETE("/workflows/:id", agentflowHandler.Delete)
 	}
 
-	return r
+	return r, labManager.Shutdown
 }
 
 // Ensure Store satisfies repository interfaces at compile time.

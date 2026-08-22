@@ -21,6 +21,11 @@ type Config struct {
 	// HTTP service and load-tests it). Off by default — it spawns a real local
 	// server and drives real traffic, so it's opt-in via SANDBOX_ENABLED=1.
 	SandboxEnabled bool
+	// LabsEnabled turns on ScaleForge Labs (real containerised environments for
+	// S3, Kubernetes, Postgres and Redis, driven from a browser terminal). Off by
+	// default — a lab pulls images and holds real memory — so it's opt-in via
+	// LABS_ENABLED=1.
+	LabsEnabled bool
 }
 
 func Load() (*Config, error) {
@@ -36,6 +41,7 @@ func Load() (*Config, error) {
 		GroqAPIKey:     getEnv("GROQ_API_KEY", ""),
 		AssistModel:    getEnv("ASSIST_MODEL", ""),
 		SandboxEnabled: getEnv("SANDBOX_ENABLED", "") == "1",
+		LabsEnabled:    getEnv("LABS_ENABLED", "") == "1",
 	}
 
 	return cfg, nil

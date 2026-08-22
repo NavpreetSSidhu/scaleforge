@@ -299,6 +299,98 @@ When `GROQ_API_KEY` is set, each lesson exposes an optional AI **Tutor** (slide-
 envelope. The tutor is rate-limited per client; lessons and animations work fully without a
 key (the AI entry points are simply hidden).
 
+## Labs
+
+Every other tab in ScaleForge *models* infrastructure. **Labs** runs it. Each lab starts
+genuine containers on an isolated Docker network, drops you into a real shell inside that
+network, and verifies your progress by querying the live system — not by comparing your
+answer to a stored one.
+
+```
+Browser                     Go API                      Docker
+┌──────────────┐  WebSocket ┌────────────────┐         ┌──────────────────────┐
+│  xterm.js    │◄──────────►│ lab.Terminal   │ PTY ───►│ workstation container│
+│  terminal    │  (binary)  │ (docker exec)  │         │  aws / kubectl / psql│
+├──────────────┤            ├────────────────┤         ├──────────────────────┤
+│  objectives  │  POST      │ lab.Verify     │ exec ──►│ service containers   │
+│  checklist   │◄──────────►│ (check scripts)│         │  minio / k3s / pg    │
+└──────────────┘  /verify   └────────────────┘         └──────────────────────┘
+                                                        one network per session
+```
+
+**Enable it:** labs hold real memory and pull real images, so they are opt-in.
+
+```bash
+LABS_ENABLED=1   # in backend/.env, with Docker running
+```
+
+| Lab | Environment | Teaches |
+| --- | --- | --- |
+| **S3: Buckets, Objects & Versioning** | `minio/minio` + `amazon/aws-cli` | Buckets vs. keys, versioning, why a delete writes a *delete marker* |
+| **Kubernetes: Deployments & Self-Healing** | `rancher/k3s` (real single-node cluster) | Namespaces, ReplicaSets, the reconciliation loop, Services, scaling |
+| **Postgres: Indexes & Query Plans** | `postgres:16-alpine`, 200k seeded rows | Seq vs. index scans, `EXPLAIN`, composite indexes, finding unused indexes |
+| **Redis: TTLs, Eviction & Hit Rate** | `redis:7-alpine` | TTLs, `maxmemory` policies, LRU eviction under real pressure, hash packing |
+
+### How a lab is put together
+
+A lab is **data** (`internal/lab/labs_builtin.go`), not code: a set of services, a
+workstation, a readiness probe, optional seed scripts, and a list of objectives.
+
+```go
+Services:    []Service{{Name: "minio", Image: "minio/minio:latest", ...}},
+Workstation: Workstation{Image: "amazon/aws-cli:latest", Entrypoint: "/bin/sh"},
+Ready:       "aws s3 ls >/dev/null 2>&1",
+Tasks:       []Task{{ID: "create-bucket", Check: "aws s3api head-bucket --bucket scaleforge-lab", ...}},
+```
+
+Two details carry most of the design:
+
+- **Checks are shell scripts, not an assertion DSL.** A check exits 0 when the objective is
+  met, so it can ask the real system anything that system's own CLI can express — a kubectl
+  JSONPath, a `psql` query against `pg_indexes`, a field out of `redis-cli INFO`.
+- **The workstation is usually a service.** `k3s` already ships `kubectl` and `postgres`
+  ships `psql`, so those labs attach the terminal straight to the service container. A
+  separate workstation appears only where client and server genuinely differ — the S3 lab
+  drives MinIO with the real AWS CLI, exactly as you would drive S3.
+
+Completion is **monotonic within a run**: later objectives routinely undo the observable
+state an earlier one created (the S3 lab deletes the object it had you upload; the Redis lab
+evicts the key it had you set), and an objective already met must not be un-earned by one.
+
+Sessions expire after 45 minutes and are reaped, and the server tears down every lab
+container on shutdown, so a forgotten browser tab can't pin memory on the host.
+
+### Testing
+
+Three layers, because each catches a different class of mistake:
+
+- **`internal/lab` unit tests** validate the catalog's invariants and parse every check
+  with `sh -n` — a lab is data, so a quoting mistake would otherwise surface only as an
+  objective that can never pass.
+- **`internal/dockerx` tests** pin the argument-building contract: the one-shot path
+  (checks) and the interactive path (terminal) must produce the same environment, or an
+  objective can fail for a user whose shell can plainly satisfy it.
+- **`lab_handler_test.go`** covers the HTTP surface, including that the catalog never
+  serves the answer key (hints and check scripts).
+
+The container-backed test is opt-in, since it needs a daemon and starts real containers:
+
+```bash
+LAB_DOCKER_TEST=1 go test ./internal/lab/ -run TestLabsEndToEnd -v -timeout 25m
+```
+
+It provisions **every** lab in parallel, solves each objective with the commands that
+lab's own hints give, and verifies after every step. Three assertions carry the weight:
+
+1. **Nothing is complete before the user acts.** An objective satisfied by the lab's own
+   setup can never be earned — this caught the Postgres `ANALYZE` objective, which the
+   seed step had already satisfied.
+2. **The targeted objective completes** after its step.
+3. **No earlier objective is un-earned** by a later step.
+
+On the frontend, `labStore`, `useLabs`, `LabsView` and `LabWorkspace` are covered by
+vitest, including a regression test for a session whose endpoint list arrives as `null`.
+
 ## Agent Studio
 
 The **Studio** tab extends ScaleForge from *infrastructure* design into **agentic / LLM

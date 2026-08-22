@@ -18,6 +18,7 @@ import {
   PanelRight,
   LogIn,
   MoreHorizontal,
+  Container,
   Sparkles,
   ShieldCheck,
 } from 'lucide-react';
@@ -48,6 +49,7 @@ const tabs: { id: AppView; label: string; icon: React.ReactNode }[] = [
   { id: 'compare', label: 'Compare', icon: <GitCompareArrows className="h-4 w-4" /> },
   { id: 'learn', label: 'Learn', icon: <GraduationCap className="h-4 w-4" /> },
   { id: 'interview', label: 'Interview', icon: <MessagesSquare className="h-4 w-4" /> },
+  { id: 'labs', label: 'Labs', icon: <Container className="h-4 w-4" /> },
   { id: 'studio', label: 'Studio', icon: <Bot className="h-4 w-4" /> },
   { id: 'mobile', label: 'Mobile', icon: <Smartphone className="h-4 w-4" /> },
 ];

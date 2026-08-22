@@ -16,6 +16,8 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
+        // The lab terminal is a WebSocket upgrade through this same prefix.
+        ws: true,
         rewrite: (p) => p.replace(/^\/api/, ''),
       },
     },
