@@ -1,37 +1,27 @@
-import {
-  Bomb,
-  RotateCcw,
-  ShieldAlert,
-  Skull,
-  TrendingUp,
-  Wand2,
-} from "lucide-react";
-import { compact } from "@/lib/format";
-import { useArchitectureStore } from "@/store/architectureStore";
-import { useAssistantStore } from "@/store/assistantStore";
-import { useChaosStore } from "@/store/chaosStore";
-import { useAssistantEnabled } from "@/features/assistant/AssistantDrawer";
-import { useChaosSimulation } from "./useChaosSimulation";
-import { ChaosMonkeyPanel } from "./ChaosMonkeyPanel";
+import { Bomb, RotateCcw, ShieldAlert, Skull, TrendingUp, Wand2 } from 'lucide-react';
+import { compact } from '@/lib/format';
+import { useArchitectureStore } from '@/store/architectureStore';
+import { useAssistantStore } from '@/store/assistantStore';
+import { useChaosStore } from '@/store/chaosStore';
+import { useAssistantEnabled } from '@/features/assistant/AssistantDrawer';
+import { useChaosSimulation } from './useChaosSimulation';
+import { ChaosMonkeyPanel } from './ChaosMonkeyPanel';
 
 /** Colour for the 0–100 resilience score, matching the grade ramp elsewhere. */
 function scoreColor(score: number): string {
-  if (score >= 80) return "#2fd39e";
-  if (score >= 60) return "#8fd14f";
-  if (score >= 40) return "#f5b14b";
-  return "#ff6058";
+  if (score >= 80) return '#2fd39e';
+  if (score >= 60) return '#8fd14f';
+  if (score >= 40) return '#f5b14b';
+  return '#ff6058';
 }
 
 const SPIKES = [1, 2, 5, 10, 20];
 
 /** Builds the prompt the assistant auto-answers when "Make it resilient" is clicked. */
-function resiliencePrompt(
-  spofLabels: string[],
-  availabilityPct: number,
-): string {
+function resiliencePrompt(spofLabels: string[], availabilityPct: number): string {
   if (spofLabels.length > 0) {
     return `My architecture has single points of failure: ${spofLabels.join(
-      ", ",
+      ', ',
     )}. How do I eliminate them and make the system fault-tolerant? Give concrete changes.`;
   }
   return `Under failure my system only serves about ${availabilityPct}% of traffic. How do I make it more resilient? Give concrete changes.`;
@@ -107,9 +97,7 @@ export function ChaosControls() {
         <span className="hidden items-center gap-1 text-[11px] text-ink-faint sm:flex">
           <Skull className="h-3.5 w-3.5" /> click a node to kill it
           {killedNodeIds.length > 0 && (
-            <span className="ml-1 font-mono text-danger">
-              ({killedNodeIds.length} down)
-            </span>
+            <span className="ml-1 font-mono text-danger">({killedNodeIds.length} down)</span>
           )}
         </span>
 
@@ -117,7 +105,7 @@ export function ChaosControls() {
         <label className="flex items-center gap-1.5 text-[11px] text-ink-faint">
           Region outage
           <select
-            value={outageRegion ?? ""}
+            value={outageRegion ?? ''}
             onChange={(e) => setOutageRegion(e.target.value || null)}
             className="rounded-md border border-white/[0.08] bg-surface-panel px-1.5 py-0.5 text-[11px] text-ink"
           >
@@ -141,8 +129,8 @@ export function ChaosControls() {
                 onClick={() => setSpikeMultiplier(m)}
                 className={`px-1.5 py-0.5 font-mono text-[11px] transition ${
                   spikeMultiplier === m
-                    ? "bg-amber/20 text-amber"
-                    : "text-ink-faint hover:bg-surface-hover"
+                    ? 'bg-amber/20 text-amber'
+                    : 'text-ink-faint hover:bg-surface-hover'
                 }`}
               >
                 {m}×
@@ -183,42 +171,30 @@ export function ChaosControls() {
             <span
               className="font-mono font-semibold"
               style={{
-                color: fullOutage
-                  ? "#ff6058"
-                  : availabilityPct! < 100
-                    ? "#f5b14b"
-                    : "#2fd39e",
+                color: fullOutage ? '#ff6058' : availabilityPct! < 100 ? '#f5b14b' : '#2fd39e',
               }}
             >
-              {fullOutage ? "OUTAGE" : `${availabilityPct}%`}
+              {fullOutage ? 'OUTAGE' : `${availabilityPct}%`}
             </span>
           </span>
 
           {result.failedRps > 0 && (
             <span className="text-ink-faint">
-              shedding{" "}
-              <span className="font-mono text-danger">
-                {compact(result.failedRps)}
-              </span>{" "}
+              shedding <span className="font-mono text-danger">{compact(result.failedRps)}</span>{' '}
               rps
             </span>
           )}
 
           {spofLabels.length > 0 && (
             <span className="text-ink-faint">
-              SPOFs:{" "}
-              <span className="text-danger">{spofLabels.join(", ")}</span>
+              SPOFs: <span className="text-danger">{spofLabels.join(', ')}</span>
             </span>
           )}
 
           {assistantEnabled && (
             <button
               type="button"
-              onClick={() =>
-                openAssistant(
-                  resiliencePrompt(spofLabels, availabilityPct ?? 0),
-                )
-              }
+              onClick={() => openAssistant(resiliencePrompt(spofLabels, availabilityPct ?? 0))}
               className="ml-auto flex items-center gap-1.5 rounded-lg bg-accent/15 px-2.5 py-1 font-semibold text-accent transition hover:bg-accent/25"
             >
               <Wand2 className="h-3.5 w-3.5" /> Make it resilient

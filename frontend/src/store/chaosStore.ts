@@ -1,5 +1,5 @@
-import { create } from "zustand";
-import type { ChaosResult, GraphNode } from "@/types/domain";
+import { create } from 'zustand';
+import type { ChaosResult, GraphNode } from '@/types/domain';
 
 /**
  * Chaos Monkey tuning, after Netflix's (github.com/Netflix/chaosmonkey): each
@@ -14,7 +14,7 @@ export const MONKEY_HEAL_TICKS = 2;
 export interface MonkeyEvent {
   id: number;
   tick: number;
-  kind: "kill" | "replace" | "outage" | "info";
+  kind: 'kill' | 'replace' | 'outage' | 'info';
   text: string;
 }
 
@@ -70,11 +70,7 @@ const cleared = {
 };
 
 let eventId = 0;
-const event = (
-  tick: number,
-  kind: MonkeyEvent["kind"],
-  text: string,
-): MonkeyEvent => ({
+const event = (tick: number, kind: MonkeyEvent['kind'], text: string): MonkeyEvent => ({
   id: ++eventId,
   tick,
   kind,
@@ -93,8 +89,7 @@ export const useChaosStore = create<ChaosState>((set) => ({
   mode: false,
   ...cleared,
 
-  toggleMode: () =>
-    set((s) => (s.mode ? { mode: false, ...cleared } : { mode: true })),
+  toggleMode: () => set((s) => (s.mode ? { mode: false, ...cleared } : { mode: true })),
 
   toggleKill: (nodeId) =>
     set((s) => ({
@@ -116,8 +111,8 @@ export const useChaosStore = create<ChaosState>((set) => ({
         s.monkeyLog,
         event(
           s.monkeyTickCount,
-          on ? "info" : reason ? "outage" : "info",
-          reason ?? (on ? "Chaos Monkey unleashed" : "Chaos Monkey leashed"),
+          on ? 'info' : reason ? 'outage' : 'info',
+          reason ?? (on ? 'Chaos Monkey unleashed' : 'Chaos Monkey leashed'),
         ),
       ),
     })),
@@ -139,7 +134,7 @@ export const useChaosStore = create<ChaosState>((set) => ({
           events.push(
             event(
               tick,
-              "replace",
+              'replace',
               `ASG replaced an instance of ${byId.get(h.nodeId)?.label ?? h.nodeId}`,
             ),
           );
@@ -148,9 +143,12 @@ export const useChaosStore = create<ChaosState>((set) => ({
       });
 
       if (rng() < MONKEY_KILL_PROBABILITY) {
+        // Netflix's "minimum time between terminations": a group still waiting
+        // for its replacement isn't hit again until it has recovered.
         const alive = nodes.filter(
           (n) =>
             !s.killedNodeIds.includes(n.id) &&
+            !heals.some((h) => h.nodeId === n.id) &&
             Math.max(n.config.replicas, 1) - (killed[n.id] ?? 0) > 0,
         );
         if (alive.length > 0) {
@@ -160,7 +158,7 @@ export const useChaosStore = create<ChaosState>((set) => ({
           events.push(
             event(
               tick,
-              "kill",
+              'kill',
               `Terminated 1 instance of ${victim.label} — ${left} of ${Math.max(victim.config.replicas, 1)} left`,
             ),
           );
@@ -176,9 +174,7 @@ export const useChaosStore = create<ChaosState>((set) => ({
         monkeyTickCount: tick,
         killedInstances: killed,
         heals,
-        monkeyLog: events.length
-          ? pushLog(s.monkeyLog, ...events)
-          : s.monkeyLog,
+        monkeyLog: events.length ? pushLog(s.monkeyLog, ...events) : s.monkeyLog,
       };
     }),
 
@@ -197,11 +193,7 @@ export const useChaosStore = create<ChaosState>((set) => ({
         monkeyOn: false,
         monkeyLog: pushLog(
           s.monkeyLog,
-          event(
-            s.monkeyTickCount,
-            "outage",
-            "Outage detected — outage checker leashed the monkey",
-          ),
+          event(s.monkeyTickCount, 'outage', 'Outage detected — outage checker leashed the monkey'),
         ),
       };
     }),

@@ -1,8 +1,8 @@
-import { useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import { useArchitectureStore } from "@/store/architectureStore";
-import { useChaosStore } from "@/store/chaosStore";
+import { useEffect } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+import { useArchitectureStore } from '@/store/architectureStore';
+import { useChaosStore } from '@/store/chaosStore';
 
 /**
  * Drives Chaos / Resilience mode: while it's on, debounce-POSTs `/chaos` whenever
@@ -47,24 +47,21 @@ export function useChaosSimulation() {
 
   // Re-run whenever any input that affects the failure picture changes.
   const nodeSig = nodes
-    .map(
-      (n) =>
-        `${n.id}:${n.type}:${n.config.replicas}:${n.config.cpu}:${n.config.region ?? ""}`,
-    )
-    .join("|");
+    .map((n) => `${n.id}:${n.type}:${n.config.replicas}:${n.config.cpu}:${n.config.region ?? ''}`)
+    .join('|');
   const key = [
     mode,
     nodeSig,
-    edges.map((e) => `${e.source}>${e.target}`).join("|"),
-    killedNodeIds.join(","),
+    edges.map((e) => `${e.source}>${e.target}`).join('|'),
+    killedNodeIds.join(','),
     JSON.stringify(killedInstances),
-    outageRegion ?? "",
+    outageRegion ?? '',
     spikeMultiplier,
     traffic.concurrentUsers,
     traffic.requestsPerUserMin,
     traffic.peakTrafficMultiplier,
     provider,
-  ].join("~");
+  ].join('~');
 
   useEffect(() => {
     if (!mode || nodes.length === 0) {
