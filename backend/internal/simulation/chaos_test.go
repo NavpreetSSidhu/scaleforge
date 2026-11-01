@@ -142,3 +142,29 @@ func TestChaosResilienceScoreRewardsRedundancy(t *testing.T) {
 		t.Errorf("redundant graph should have no SPOFs, got %d", len(redundant.SPOFs))
 	}
 }
+
+// Chaos Monkey kills one instance: a 3-replica tier keeps serving, a 1-replica
+// tier dies — the difference between a replicated cluster and a SPOF.
+func TestChaosKillingOneInstance(t *testing.T) {
+	svc := newService(&fakeRepo{})
+	g := linearGraph()
+	g.Nodes[1].Config.Replicas = 3
+
+	res := svc.Chaos(ChaosRequest{Graph: g, Traffic: normalTraffic(),
+		Scenario: ChaosScenario{KilledInstances: map[string]int{"api": 1}}})
+	if !res.Available {
+		t.Fatalf("losing 1 of 3 API instances should not cause an outage")
+	}
+	if hasSpof(res.SPOFs, "api") || !hasSpof(res.SPOFs, "db") {
+		t.Fatalf("SPOFs = %+v, want db (1 replica) but not api (3 replicas)", res.SPOFs)
+	}
+	if got := impactOf(res.NodeImpacts, "api"); got == ImpactDead || got == ImpactHealthy {
+		t.Fatalf("api impact = %q, want degraded/overloaded", got)
+	}
+
+	res = svc.Chaos(ChaosRequest{Graph: g, Traffic: normalTraffic(),
+		Scenario: ChaosScenario{KilledInstances: map[string]int{"db": 1}}})
+	if res.Available || impactOf(res.NodeImpacts, "db") != ImpactDead {
+		t.Fatalf("losing the only DB instance should be an outage with db dead")
+	}
+}

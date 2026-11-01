@@ -126,6 +126,7 @@ Expected results (approximate):
 | PUT    | `/architectures/:id`  | Update architecture            |
 | DELETE | `/architectures/:id`  | Delete architecture            |
 | POST   | `/simulate`           | Run simulation                 |
+| POST   | `/chaos`              | Inject failures (killed nodes/instances, region outage, spike) |
 | GET    | `/simulation/:id`     | Get saved simulation result    |
 | GET    | `/achievements`       | List achievements + unlock state |
 
@@ -261,6 +262,35 @@ and apply to the canvas.
 - The UI is a slide-in drawer (sparkle button in the top bar, hidden when no key is set).
   Proposed changes appear as chips you **Apply** (or **Apply all**), then auto-resimulate.
 - `POST /assistant` is guest-friendly but rate-limited per client to protect the free quota.
+
+## Chaos Monkey
+
+ScaleForge has a version of Netflix's
+[Chaos Monkey](https://netflix.github.io/chaosmonkey/), the tool described in
+[The Netflix Simian Army](https://netflixtechblog.com/the-netflix-simian-army-16e57fbab116).
+Turn on **Resilience mode** under the canvas, then **Unleash Chaos Monkey**. It keeps
+killing random instances while the canvas shows whether your design still serves traffic.
+
+Chaos Monkey kills one **instance** of a cluster, not a whole service. ScaleForge does the
+same: `POST /chaos` accepts `killedInstances` (`{nodeId: count}`), and each kill takes away
+one replica and its share of capacity. A 3-replica API keeps running after losing one
+instance. A single-replica database goes down.
+
+| Netflix | ScaleForge |
+|---------|------------|
+| Randomly terminates production instances | Each tick a biased coin decides; on "kill" one random instance dies |
+| Mean time between terminations (work days) | A 2.5s tick stands in for a work day |
+| Auto Scaling groups replace lost instances | Nodes with autoscaling get the instance back two ticks later |
+| Steady-state hypothesis | Every check asks whether 100% of traffic is still served ("steady state held X/Y") |
+| Outage checker disables the monkey | A full outage pauses the monkey automatically |
+| Chaos Gorilla / Chaos Kong (zone/region loss) | The region-outage control |
+
+The **resilience score** uses the same idea. It removes one instance from each critical
+node in turn, so only single-replica nodes count as single points of failure.
+
+Not modelled: Netflix's opt-out exceptions, the business-hours schedule, or limits on
+kills per group. The monkey logic is in `frontend/src/store/chaosStore.ts`. The failure
+math is in `backend/internal/simulation/chaos.go`.
 
 ## Runtime / language comparison
 

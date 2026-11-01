@@ -140,6 +140,8 @@ export interface Spof {
 
 export interface ChaosScenario {
   killedNodeIds: string[];
+  /** Single instances terminated per node (Chaos Monkey). */
+  killedInstances?: Record<string, number>;
   outageRegion?: string;
   spikeMultiplier?: number;
 }

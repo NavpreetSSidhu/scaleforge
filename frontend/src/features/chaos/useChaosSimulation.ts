@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { useArchitectureStore } from '@/store/architectureStore';
-import { useChaosStore } from '@/store/chaosStore';
+import { useEffect } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useArchitectureStore } from "@/store/architectureStore";
+import { useChaosStore } from "@/store/chaosStore";
 
 /**
  * Drives Chaos / Resilience mode: while it's on, debounce-POSTs `/chaos` whenever
@@ -13,8 +13,16 @@ import { useChaosStore } from '@/store/chaosStore';
  */
 export function useChaosSimulation() {
   const { nodes, edges, traffic, provider } = useArchitectureStore();
-  const { mode, killedNodeIds, outageRegion, spikeMultiplier, setResult, setLoading } =
-    useChaosStore();
+  const {
+    mode,
+    killedNodeIds,
+    killedInstances,
+    outageRegion,
+    spikeMultiplier,
+    setResult,
+    setLoading,
+    recordCheck,
+  } = useChaosStore();
 
   const run = useMutation({
     mutationFn: () =>
@@ -24,6 +32,7 @@ export function useChaosSimulation() {
         provider,
         scenario: {
           killedNodeIds,
+          killedInstances,
           outageRegion: outageRegion ?? undefined,
           spikeMultiplier,
         },
@@ -31,26 +40,31 @@ export function useChaosSimulation() {
     onSuccess: (res) => {
       setResult(res);
       setLoading(false);
+      recordCheck(res);
     },
     onError: () => setLoading(false),
   });
 
   // Re-run whenever any input that affects the failure picture changes.
   const nodeSig = nodes
-    .map((n) => `${n.id}:${n.type}:${n.config.replicas}:${n.config.cpu}:${n.config.region ?? ''}`)
-    .join('|');
+    .map(
+      (n) =>
+        `${n.id}:${n.type}:${n.config.replicas}:${n.config.cpu}:${n.config.region ?? ""}`,
+    )
+    .join("|");
   const key = [
     mode,
     nodeSig,
-    edges.map((e) => `${e.source}>${e.target}`).join('|'),
-    killedNodeIds.join(','),
-    outageRegion ?? '',
+    edges.map((e) => `${e.source}>${e.target}`).join("|"),
+    killedNodeIds.join(","),
+    JSON.stringify(killedInstances),
+    outageRegion ?? "",
     spikeMultiplier,
     traffic.concurrentUsers,
     traffic.requestsPerUserMin,
     traffic.peakTrafficMultiplier,
     provider,
-  ].join('~');
+  ].join("~");
 
   useEffect(() => {
     if (!mode || nodes.length === 0) {

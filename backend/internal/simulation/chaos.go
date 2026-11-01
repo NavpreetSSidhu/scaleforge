@@ -9,9 +9,13 @@ import (
 // ChaosScenario describes an injected failure: specific nodes killed, an entire
 // region taken offline, and/or a traffic spike applied on top of the profile.
 type ChaosScenario struct {
-	KilledNodeIDs   []string `json:"killedNodeIds"`
-	OutageRegion    string   `json:"outageRegion,omitempty"`
-	SpikeMultiplier float64  `json:"spikeMultiplier,omitempty"`
+	KilledNodeIDs []string `json:"killedNodeIds"`
+	// KilledInstances terminates single instances (replicas) of a node, the way
+	// Netflix's Chaos Monkey kills one instance of a cluster: nodeID -> count.
+	// A node that loses every replica is dead, exactly like KilledNodeIDs.
+	KilledInstances map[string]int `json:"killedInstances,omitempty"`
+	OutageRegion    string         `json:"outageRegion,omitempty"`
+	SpikeMultiplier float64        `json:"spikeMultiplier,omitempty"`
 }
 
 type ChaosRequest struct {
@@ -128,7 +132,9 @@ func (s *Service) evaluateScenario(graph Graph, traffic TrafficProfile, provider
 
 // resilience scores the architecture (0..100) independent of the requested
 // scenario: it kills each critical node in turn and counts those whose loss
-// alone causes an outage (the SPOFs). Multi-region earns a small bonus.
+// alone causes an outage (the SPOFs). A replicated node survives losing one
+// instance, so only single-replica nodes can be SPOFs. Multi-region earns a
+// small bonus.
 func (s *Service) resilience(graph Graph, traffic TrafficProfile, provider string, defs map[string]catalog.NodeDefinition) (int, []Spof) {
 	critical := 0
 	for _, n := range graph.Nodes {
@@ -143,7 +149,8 @@ func (s *Service) resilience(graph Graph, traffic TrafficProfile, provider strin
 		if !ok || !requiredCategories[def.Category] {
 			continue
 		}
-		_, avail := s.evaluateScenario(graph, traffic, provider, ChaosScenario{KilledNodeIDs: []string{n.ID}}, defs)
+		// Lose one instance, as Chaos Monkey would: only a single-replica node dies.
+		_, avail := s.evaluateScenario(graph, traffic, provider, ChaosScenario{KilledInstances: map[string]int{n.ID: 1}}, defs)
 		if !avail.available {
 			spofs = append(spofs, Spof{NodeID: n.ID, Label: n.Label, Impact: "outage"})
 		}
@@ -178,6 +185,12 @@ func applyScenario(graph Graph, sc ChaosScenario) Graph {
 	for _, n := range graph.Nodes {
 		if killed[n.ID] {
 			continue
+		}
+		if lost := sc.KilledInstances[n.ID]; lost > 0 {
+			if n.Config.Replicas-lost <= 0 {
+				continue
+			}
+			n.Config.Replicas -= lost
 		}
 		if sc.OutageRegion != "" && regionOf(n) == sc.OutageRegion {
 			continue
@@ -258,7 +271,8 @@ func buildNodeImpacts(graph Graph, sc ChaosScenario, degraded Result, avail avai
 	for _, n := range graph.Nodes {
 		status := ImpactHealthy
 		switch {
-		case killed[n.ID] || (sc.OutageRegion != "" && regionOf(n) == sc.OutageRegion):
+		case killed[n.ID] || (sc.OutageRegion != "" && regionOf(n) == sc.OutageRegion) ||
+			(sc.KilledInstances[n.ID] > 0 && sc.KilledInstances[n.ID] >= max(n.Config.Replicas, 1)):
 			status = ImpactDead
 		case !avail.available:
 			// Full outage — surviving nodes are effectively failing too.
@@ -269,6 +283,10 @@ func buildNodeImpacts(graph Graph, sc ChaosScenario, degraded Result, avail avai
 				status = ImpactOverloaded
 			case "warning":
 				status = ImpactDegraded
+			default:
+				if sc.KilledInstances[n.ID] > 0 {
+					status = ImpactDegraded // lost instances but the survivors carry the load
+				}
 			}
 		}
 		impacts = append(impacts, NodeImpact{NodeID: n.ID, Status: status})
