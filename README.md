@@ -5,10 +5,10 @@
 ScaleForge is a gamified infrastructure architecture simulator. Engineers can visually design distributed systems on a canvas, define traffic profiles, and run simulations to estimate latency, throughput, cost, bottlenecks, and architecture scores.
 
 <p align="center">
-  <img src="./docs/preview.gif" alt="ScaleForge demo — design an architecture, run a load simulation, ask the AI assistant to add a cache, and compare runtimes" width="100%">
+  <img src="./docs/preview.gif" alt="ScaleForge demo — design an architecture, run a load simulation, ask the AI assistant to add a cache, compare runtimes, then unleash the Chaos Monkey" width="100%">
 </p>
 
-> Build an architecture → run a load simulation → ask the **AI assistant** to improve it (it proposes changes you preview and apply) → **compare languages/runtimes** and cloud providers.
+> Build an architecture → run a load simulation → ask the **AI assistant** to improve it (it proposes changes you preview and apply) → **compare languages/runtimes** and cloud providers → unleash the **Chaos Monkey** and watch it keep serving traffic.
 
 ## Architecture
 
@@ -281,6 +281,7 @@ instance. A single-replica database goes down.
 | Randomly terminates production instances | Each tick a biased coin decides; on "kill" one random instance dies |
 | Mean time between terminations (work days) | A 2.5s tick stands in for a work day |
 | Auto Scaling groups replace lost instances | Nodes with autoscaling get the instance back two ticks later |
+| Minimum time between terminations | A node waiting for a replacement isn't hit again until it has recovered |
 | Steady-state hypothesis | Every check asks whether 100% of traffic is still served ("steady state held X/Y") |
 | Outage checker disables the monkey | A full outage pauses the monkey automatically |
 | Chaos Gorilla / Chaos Kong (zone/region loss) | The region-outage control |
